@@ -1,0 +1,23 @@
+{
+  "productId": "fleet-maintenance",
+  "databaseFile": "artisys-frota-manutencao.sqlite",
+  "migrationIds": ["frota/001-initial.sql","manutencao/001-initial.sql"],
+  "persistence": [
+    {"file":"persistence/frota.persistence.json","productId":"fleet-maintenance","databaseFile":"artisys-frota-manutencao.sqlite","migrationNamespace":"frota"},
+    {"file":"persistence/manutencao.persistence.json","productId":"fleet-maintenance","databaseFile":"artisys-frota-manutencao.sqlite","migrationNamespace":"manutencao"}
+  ],
+  "screens": ["overview","fleet","readings","preventive-plans","work-orders","schedule","inventory","checklists","finance","reports","settings"],
+  "actions": {
+    "overview": [],
+    "fleet": ["save","remove"],
+    "readings": ["save"],
+    "preventive-plans": ["create","save"],
+    "work-orders": ["create","addItem","authorize","start","complete","cancel"],
+    "schedule": [],
+    "inventory": ["receive","consume","reserve","release"],
+    "checklists": ["save"],
+    "finance": ["addExpense"],
+    "reports": ["csv","issue"],
+    "settings": ["backup","restore"]
+  }
+}
