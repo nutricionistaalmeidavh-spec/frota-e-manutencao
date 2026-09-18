@@ -1,0 +1,1 @@
+{"schemaVersion":1,"productId":"fleet-maintenance","databaseFile":"artisys-frota-manutencao.sqlite","migrationNamespace":"manutencao","migrationDir":"../migrations/manutencao","seedId":"manutencao-demo-v1","seedPath":"../seeds/manutencao.json"}
