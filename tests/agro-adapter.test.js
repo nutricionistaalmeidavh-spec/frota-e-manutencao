@@ -1,0 +1,2 @@
+import test from "node:test";import assert from "node:assert/strict";import {createFleetAgroAdapter} from "../src/agro-adapter.js";
+test("adapter publica contrato ArtiSys Agro v1",()=>{const a=createFleetAgroAdapter();const e=a.fuelingRecorded({machineId:"M1",liters:50,costMinor:25000,links:{operationId:"O1"}});assert.equal(e.schemaVersion,"1.0");assert.equal(e.source,"frota-manutencao");assert.equal(e.entityId,"M1");assert.ok(e.eventId);});
