@@ -10,7 +10,7 @@ if (feed) {
   pkg.build.publish = [{provider:'generic',url:feed}];
   console.log('Canal de atualizacao HTTPS configurado para este instalador.');
 } else {
-  delete pkg.build.publish;
+  pkg.build.publish = null;
   console.log('Canal publico nao configurado; instalador sem atualizacao automatica.');
 }
 await writeFile(file, JSON.stringify(pkg,null,2)+'\n');
