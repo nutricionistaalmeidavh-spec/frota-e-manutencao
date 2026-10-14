@@ -1,5 +1,5 @@
 import{test,expect}from'@playwright/test';
-test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',async({page})=>{
+test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',async({page},testInfo)=>{
  await page.goto('/');
  await page.getByTestId('password').fill('senha-e2e-123');
  await page.getByTestId('auth-submit').click();
@@ -14,6 +14,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await page.getByRole('button',{name:'Confirmar salvar'}).click();
  await expect(page.getByRole('status').filter({hasText:'Salvar concluído'})).toBeVisible();
  await expect(page.getByText('ABC1D23')).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('12-frota-com-registro.png'),fullPage:true});
  await page.getByTestId('nav-readings').click();
  await page.getByRole('button',{name:'Ver detalhes de v-e2e'}).click();
  await page.getByRole('button',{name:'Salvar',exact:true}).click();
@@ -21,6 +22,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await page.getByTestId('field-hourmeter').fill('12');
  await page.getByRole('button',{name:'Confirmar salvar'}).click();
  await expect(page.getByText('1.100')).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('13-leitura-atualizada.png'),fullPage:true});
  await page.getByTestId('nav-fleet').click();
  await expect(page.getByText('ABC1D23')).toBeVisible();
  await expect(page.getByText('1.100')).toBeVisible();
@@ -39,4 +41,20 @@ test('backup persiste ao atualizar a página',async({page})=>{
  await page.getByTestId('auth-submit').click();
  await page.getByTestId('nav-settings').click();
  await expect(page.locator('tbody tr')).toHaveCount(1);
+});
+
+test('navegação mobile abre com os mesmos destinos',async({page},testInfo)=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await page.getByTestId('password').fill('teste-mobile-2026');
+ await page.getByTestId('auth-submit').click();
+ await expect(page.getByText('Frota + Manutenção Preventiva')).toBeVisible();
+ await page.getByRole('button',{name:'Abrir navegação'}).click();
+ await expect(page.getByTestId('nav-fleet')).toBeVisible();
+ await page.getByTestId('nav-fleet').click();
+ await expect(page.getByRole('heading',{name:'Frota e Máquinas'})).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('14-frota-mobile.png'),fullPage:true});
+ await page.getByRole('button',{name:'Novo veículo'}).click();
+ await expect(page.getByRole('dialog')).toBeVisible();
+ await page.screenshot({path:testInfo.outputPath('15-formulario-mobile.png'),fullPage:true});
 });
