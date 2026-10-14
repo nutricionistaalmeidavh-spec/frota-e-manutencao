@@ -1,5 +1,5 @@
 import {createServer} from 'node:https';
-import {randomBytes,createHash,X509Certificate} from 'node:crypto';
+import {randomBytes,randomInt,createHash,X509Certificate} from 'node:crypto';
 import {networkInterfaces} from 'node:os';
 import {join,resolve,sep,extname} from 'node:path';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
@@ -49,7 +49,7 @@ export function createMobileAccess({dataDir,distDir,backend}){
  if(!dataDir||!distDir||!backend)throw Error('Dados, interface e backend obrigatorios.');
  let server=null,info=null,code=null,codeUntil=0,used=false;
  const tokens=new Map(),attempts=new Map();
- const rotate=()=>{code=String(Math.floor(Math.random()*1e8)).padStart(8,'0');codeUntil=Date.now()+5*60000;used=false;return code};
+ const rotate=()=>{code=String(randomInt(100000000)).padStart(8,'0');codeUntil=Date.now()+5*60000;used=false;return code};
  const status=()=>info?{enabled:true,url:info.url,addresses:info.addresses,port:info.port,
   pairingCode:used||Date.now()>codeUntil?null:code,pairingExpiresAt:codeUntil,
   certificateFingerprint:info.certificateFingerprint}:{enabled:false};
