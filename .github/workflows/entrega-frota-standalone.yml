@@ -1,7 +1,7 @@
 name: Validar e empacotar Frota independente
 on:
   push:
-    branches: [release/frota-standalone-20261014, feat/frota-auto-update-20261014]
+    branches: [release/frota-standalone-20261014]
     tags: ['frota-v*']
   workflow_dispatch:
 permissions:
