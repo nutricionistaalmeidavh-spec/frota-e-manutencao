@@ -1,0 +1,2 @@
+Frota UI/UX + canonicidade — validação final em 2026-10-14.
+Mudanças: formulários, navegação compacta, persistência de backup, contratos de dados, testes mobile e Playwright.
