@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"fleet-maintenance","sourceApps":["frota","manutencao"],"corePolicy":{"selfHosted":true,"openSourceCore":true,"requiredPaidServices":[]},"targets":["desktop","pwa"],"migrations":["./migrations/frota","./migrations/manutencao"],"seeds":["./seeds/frota.json","./seeds/manutencao.json"],"branding":"./branding/brand.json"}

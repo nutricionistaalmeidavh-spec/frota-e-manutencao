@@ -1,0 +1,46 @@
+name: Frota compatibilidade e qualidade
+on:
+  push:
+    branches:
+      - main
+      - compat/frota-ui-main-20261014
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Testar contratos, Agro, canonicidade e build web
+        run: npm run check
+      - name: Validar 11 telas, 21 acoes e persistencia
+        run: npm run qa:surface
+      - name: Preparar Chromium
+        run: npx playwright install chromium
+      - name: Testar jornadas reais e interface
+        run: npm run qa:web
+      - name: Validar empacotamento Windows
+        run: npm run build:win
+      - name: Guardar evidencias de QA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frota-main-qa
+          path: |
+            test-results/
+            qa-artifacts/phase5-summary.json
+            qa-artifacts/playwright-summary.json
+            qa-artifacts/playwright-report/
+          retention-days: 7
+          if-no-files-found: warn

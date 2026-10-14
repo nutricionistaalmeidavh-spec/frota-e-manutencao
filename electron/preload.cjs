@@ -1,0 +1,1 @@
+const{contextBridge,ipcRenderer}=require('electron'),names=['describe','authState','bootstrap','login','validate','logout','load','action'];contextBridge.exposeInMainWorld('artisys',Object.freeze(Object.fromEntries(names.map(n=>[n,p=>ipcRenderer.invoke(`artisys:${n}`,p)]))));

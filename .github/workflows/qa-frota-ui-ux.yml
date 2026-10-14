@@ -1,0 +1,45 @@
+name: QA Frota UI UX Canonicidade
+on:
+  push:
+    branches:
+      - feat/frota-ui-ux-canonical-20261014
+    paths:
+      - qa/trigger-ui-ux.txt
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: windows-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Contratos, integridade e compilacao web
+        run: npm run check
+      - name: Instalar Chromium
+        run: npx playwright install chromium
+      - name: Validar 11 telas, 21 acoes, persistencia e backup
+        run: npm run qa:surface
+      - name: QA visual e jornada real Playwright
+        run: npm run qa:web
+      - name: Validar instalador Windows
+        run: npm run build:win
+      - name: Exportar capturas reais, traces e evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frota-ui-ux-qa-evidences
+          path: |
+            test-results/
+            qa-artifacts/phase5-summary.json
+            qa-artifacts/playwright-summary.json
+            qa-artifacts/playwright-report/
+          retention-days: 7
+          if-no-files-found: warn
