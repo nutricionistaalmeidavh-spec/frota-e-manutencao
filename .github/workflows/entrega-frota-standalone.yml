@@ -23,7 +23,11 @@ jobs:
       - name: Preparar Chromium Playwright
         run: npx playwright install chromium
       - name: QA funcional e visual completo
-        run: npm run phase5
+        run: |
+          npm run qa:surface
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run qa:web
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Gerar instalador do repositorio independente
         run: npm run build:win
       - name: Gerar manifest e validar o instalador
