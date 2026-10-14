@@ -9,9 +9,12 @@ import{Icon}from'./icons.jsx';
 import'./styles.css';
 import'./premium.css';
 import{UpdaterPanel}from'./updater.jsx';
+import{createMobileBackend}from'./mobile-client.mjs';
+import{MobileAccess}from'./mobile-access.jsx';
 
 async function makeBackend(){
  if(globalThis.artisys)return globalThis.artisys;
+ if(globalThis.__ARTISYS_REMOTE__)return createMobileBackend();
  const persistence=createBrowserPersistence({productId:'fleet-maintenance'});
  const recovery=createBrowserRecovery(persistence);
  return createRpcBackend({presentation:createFleetMaintenancePresentation({persistence,recovery})});
@@ -97,6 +100,7 @@ const metrics=[
 ];
 function App(){
  const [backend,setBackend]=useState(null),[hasUsers,setHasUsers]=useState(null);
+ const [needsPairing,setNeedsPairing]=useState(false),[pairCode,setPairCode]=useState('');
  const [credentials,setCredentials]=useState({username:'admin',password:''});
  const [auth,setAuth]=useState(null),[meta,setMeta]=useState(null),[screen,setScreen]=useState('overview');
  const [data,setData]=useState(null),[vehicles,setVehicles]=useState([]),[busy,setBusy]=useState(false);
@@ -105,7 +109,7 @@ function App(){
  const [search,setSearch]=useState(''),[mobileNav,setMobileNav]=useState(false),[refresh,setRefresh]=useState(0);
  const initialDraft=useRef({});
  const mainHeading=useRef(null);
- useEffect(()=>{let alive=true;makeBackend().then(async b=>{const state=await b.authState();if(alive){setHasUsers(state.hasUsers);setBackend(b)}}).catch(e=>{if(alive)setError(e.message)});return()=>{alive=false}},[]);
+ useEffect(()=>{let alive=true;makeBackend().then(async b=>{if(b.paired&&!b.paired()){if(alive){setBackend(b);setHasUsers(true);setNeedsPairing(true)}return}try{const state=await b.authState();if(alive){setHasUsers(state.hasUsers);setBackend(b)}}catch(e){if(b.paired){b.forget();if(alive){setBackend(b);setHasUsers(true);setNeedsPairing(true)}}else throw e}}).catch(e=>{if(alive)setError(e.message)});return()=>{alive=false}},[]);
  useEffect(()=>{let active=true;if(!backend||!auth)return;backend.describe().then(m=>{if(active){setMeta(m);setScreen(m.navigation[0]?.id??'overview')}}).catch(e=>{if(active)setError(e.message)});return()=>{active=false}},[backend,auth]);
  useEffect(()=>{let active=true;if(!backend||!auth||!meta)return;setLoading(true);setData(null);
    backend.load({screenId:screen,auth}).then(d=>{if(active)setData(d)}).catch(e=>{if(active)setError(e.message)}).finally(()=>{if(active)setLoading(false)});
@@ -120,10 +124,11 @@ function App(){
  const actionFields=panel?getActionFields(screen,panel,{selected,vehicles,backups:data?.backups??[]}):[];
  const sections=navSections.map(section=>({...section,items:section.items.filter(id=>meta?.navigation?.some(n=>n.id===id))}));
  const navigate=id=>{setScreen(id);setChosen(null);setPanel(null);setMessage(null);setError('');setSearch('');setMobileNav(false);requestAnimationFrame(()=>mainHeading.current?.focus())};
+ async function submitPair(e){e.preventDefault();if(!backend||busy)return;setBusy(true);setError('');try{await backend.pair(pairCode);const s=await backend.authState();setHasUsers(s.hasUsers);setNeedsPairing(false);setPairCode('')}catch(e){setError(e.message)}finally{setBusy(false)}}
  async function authenticate(e){e.preventDefault();if(busy||!backend)return;setBusy(true);setError('');
   try{if(!hasUsers){await backend.bootstrap(credentials);setHasUsers(true)}
    const session=await backend.login(credentials);setAuth({sessionId:session.session.id,token:session.token});
-  }catch(e){setError(e.message)}finally{setBusy(false)}
+  }catch(e){if(backend.paired&&!backend.paired())setNeedsPairing(true);setError(e.message)}finally{setBusy(false)}
  }
  async function logout(){if(!backend||!auth)return;try{await backend.logout(auth)}catch{}setAuth(null);setMeta(null);setData(null);setChosen(null);setPanel(null);setError('');setCredentials(c=>({...c,password:''}))}
  const openAction=action=>{const prepared=defaultDraft(getActionFields(screen,action,{selected,vehicles,backups:data?.backups??[]}),selected);initialDraft.current={...prepared};setPanel(action);setMessage(null);setError('');setDraft(prepared)};
@@ -149,7 +154,8 @@ function App(){
   finally{setBusy(false)}
  }
  if(!backend||hasUsers===null)return <div className="splash" role="status">Preparando ArtiSys Frota…</div>;
- if(!auth)return <div className="auth-layout"><section className="auth-hero"><span className="brand-glyph">A</span><p className="eyebrow">ARTISYS · GESTÃO LOCAL</p><h1>Sua frota sob controle, do pátio à manutenção.</h1><p>Veículos, ordens de serviço, peças e custos no mesmo fluxo de trabalho.</p><div className="hero-proof"><span>Dados locais</span><span>Sem assinatura obrigatória</span></div></section><form className="login-card" onSubmit={authenticate}><p className="eyebrow">ACESSO AO SISTEMA</p><h2>{hasUsers?'Entre na sua operação':'Configure seu administrador'}</h2><p>{hasUsers?'Use o usuário e a senha cadastrados neste computador.':'O primeiro acesso cria a conta administradora neste dispositivo.'}</p><label>Usuário<input data-testid="username" autoComplete="username" value={credentials.username} onChange={e=>setCredentials({...credentials,username:e.target.value})} required/></label><label>Senha<input data-testid="password" type="password" minLength="8" autoComplete={hasUsers?'current-password':'new-password'} value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})} required/></label>{error&&<p className="error-text" role="alert">{error}</p>}<button type="submit" className="primary" data-testid="auth-submit" disabled={busy}>{busy?'Aguarde…':hasUsers?'Entrar':'Criar administrador e entrar'}</button><small>O armazenamento da versão desktop permanece neste computador.</small></form></div>;
+ if(needsPairing)return <div className="auth-layout"><section className="auth-hero"><span className="brand-glyph">A</span><p className="eyebrow">ARTISYS · ACESSO MOVEL</p><h1>Conecte ao Frota no computador.</h1><p>O Windows precisa estar ligado e na mesma rede Wi-Fi que este celular.</p></section><form className="login-card" onSubmit={submitPair}><p className="eyebrow">PAREAMENTO SEGURO</p><h2>Digite o código do computador</h2><p>Abra Configurações → Acesso pelo celular no Frota do Windows e copie o código de oito dígitos. Confira o certificado HTTPS antes de informar sua senha.</p><label>Código temporário<input data-testid="mobile-pair-input" inputMode="numeric" pattern="[0-9]{8}" maxLength={8} required autoComplete="one-time-code" value={pairCode} onChange={e=>setPairCode(e.target.value.replace(/\D/g,''))}/></label>{error&&<p className="error-text" role="alert">{error}</p>}<button className="primary" disabled={busy} type="submit">{busy?'Conectando…':'Conectar celular'}</button></form></div>;
+ if(!auth)return <div className="auth-layout"><section className="auth-hero"><span className="brand-glyph">A</span><p className="eyebrow">ARTISYS · GESTÃO LOCAL</p><h1>Sua frota sob controle, do pátio à manutenção.</h1><p>Veículos, ordens de serviço, peças e custos no mesmo fluxo de trabalho.</p><div className="hero-proof"><span>Dados locais</span><span>Sem assinatura obrigatória</span></div></section><form className="login-card" onSubmit={authenticate}><p className="eyebrow">ACESSO AO SISTEMA</p><h2>{hasUsers?'Entre na sua operação':'Configure seu administrador'}</h2><p>{hasUsers?'Use o usuário e a senha cadastrados neste computador.':'O primeiro acesso cria a conta administradora neste dispositivo.'}</p><label>Usuário<input data-testid="username" autoComplete="username" value={credentials.username} onChange={e=>setCredentials({...credentials,username:e.target.value})} required/></label><label>Senha<input data-testid="password" type="password" minLength="8" autoComplete={hasUsers?'current-password':'new-password'} value={credentials.password} onChange={e=>setCredentials({...credentials,password:e.target.value})} required/></label>{error&&<p className="error-text" role="alert">{error}</p>}<button type="submit" className="primary" data-testid="auth-submit" disabled={busy}>{busy?'Aguarde…':hasUsers?'Entrar':'Criar administrador e entrar'}</button><small>{globalThis.__ARTISYS_REMOTE__?'Os dados permanecem no computador Windows. O celular requer a mesma rede Wi-Fi.':'O armazenamento da versão desktop permanece neste computador.'}</small></form></div>;
  if(!meta)return <div className="splash" role="status">Carregando área de trabalho…</div>;
  return <div className="app-shell">
    <button className="mobile-menu" type="button" onClick={()=>setMobileNav(v=>!v)} aria-label={mobileNav?'Fechar navegação':'Abrir navegação'}><Icon name="overview" size={18}/> Menu</button>
@@ -166,6 +172,7 @@ function App(){
       <section className="page-heading"><div><span className="eyebrow">ÁREA DE TRABALHO / {title.toLocaleUpperCase('pt-BR')}</span><h1 ref={mainHeading} tabIndex={-1}>{title}</h1><p>{screenHelp[screen]}</p></div>
        {screen==='overview'&&<button className="primary" type="button" onClick={()=>navigate('fleet')}>Gerenciar frota <Icon name="arrow" size={16}/></button>}
       </section>
+      {screen==='settings'&&<MobileAccess auth={auth}/>}
       {message&&<div className="notice notice-success" role="status">{message.text}<button type="button" aria-label="Fechar aviso" onClick={()=>setMessage(null)}>×</button></div>}
       {error&&!panel&&<div className="notice notice-error" role="alert">{error}<button type="button" aria-label="Fechar erro" onClick={()=>setError('')}>×</button></div>}
       {loading||data===null?<div className="loading-surface" role="status">Carregando informações…</div>:<>
@@ -199,4 +206,5 @@ function App(){
     </form></section></div>}
  </div>;
 }
+if(globalThis.__ARTISYS_REMOTE__&&'serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 createRoot(document.getElementById('root')).render(<><App/><UpdaterPanel/></>);

@@ -13,4 +13,5 @@ const updates=Object.freeze({
     return ()=>ipcRenderer.removeListener('artisys:update:status',handler);
   }
 });
-contextBridge.exposeInMainWorld('artisys',Object.freeze({...backend,updates}));
+const mobile=Object.freeze(Object.fromEntries(['status','start','newCode','stop'].map(name=>[name,auth=>ipcRenderer.invoke('artisys:mobile:'+name,{auth})])));
+contextBridge.exposeInMainWorld('artisys',Object.freeze({...backend,updates,mobile}));
