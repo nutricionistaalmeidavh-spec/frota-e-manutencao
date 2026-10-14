@@ -51,3 +51,14 @@ test('OS preserva o fluxo canônico e protege alterações concorrentes',()=>wit
  const started=await call('work-orders','start',{id:'OS-001',technicianPartyId:'TEC-1',expectedVersion:2});
  assert.equal(started.payload.status,'in-progress');
 }));
+
+test('checklist mantém referência de veículo e bloqueia atualização com revisão antiga',()=>withHost(async(h,auth)=>{
+ const call=(screenId,action,input)=>h.backend.action({screenId,action,input,auth});
+ await call('fleet','save',{assetId:'CAM-C1',plate:'CCC1C11'});
+ const first=await call('checklists','save',{id:'CHK-1',assetId:'CAM-C1',title:'Inspeção diária',status:'pending'});
+ assert.equal(first.version,1);
+ const changed=await call('checklists','save',{id:'CHK-1',assetId:'CAM-C1',title:'Inspeção realizada',status:'ok',expectedVersion:1});
+ assert.equal(changed.version,2);
+ await assert.rejects(()=>call('checklists','save',{id:'CHK-1',assetId:'CAM-C1',title:'Atualização antiga',expectedVersion:1}),/outra operação/i);
+ await assert.rejects(()=>call('checklists','save',{id:'CHK-2',assetId:'SEM-VEICULO',title:'Sem vínculo'}),/não encontrado/i);
+}));
