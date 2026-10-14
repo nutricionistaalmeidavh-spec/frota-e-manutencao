@@ -45,7 +45,7 @@ test('workflow usa GitHub Release, valida metadados e mantem Drive opcional',asy
 
 test('primeira release nao falha por consultar tag inexistente',async()=>{
   const flow=await readFile(new URL('../.github/workflows/entrega-frota-standalone.yml',import.meta.url),'utf8');
-  assert.match(flow,/gh api .*releases\\?per_page=100/);
-  assert.match(flow,/any\\(\\.\\[\\]; \\.tag_name == \\$tag\\)/);
-  assert.doesNotMatch(flow,/gh release view \\$env:RELEASE_TAG/);
+  assert.match(flow,/gh api .*releases\?per_page=100/);
+  assert.match(flow,/any\(\.\[\]; \.tag_name == \$tag\)/);
+  assert.doesNotMatch(flow,/gh release view \$env:RELEASE_TAG/);
 });
