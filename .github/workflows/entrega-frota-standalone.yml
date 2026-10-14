@@ -127,13 +127,6 @@ jobs:
           $assets = @((Get-ChildItem release -File | Where-Object { $_.Name -match '^ArtiSys-Frota-Setup-.*\.exe$|\.blockmap$|^latest\.yml$|^SHA256SUMS\.txt$|^DELIVERY-MANIFEST\.json$' }) | ForEach-Object FullName)
           gh release create $env:RELEASE_TAG @assets --title "ArtiSys Frota $env:RELEASE_VERSION" --target $env:GITHUB_SHA --notes "Build Windows aprovado por testes e QA, com atualizacao estilo ArtiSys PDV." --draft
           if ($LASTEXITCODE -ne 0) { throw 'Falha ao criar release draft' }
-      - name: Instalar rclone para Drive, quando configurado
-        if: github.ref == 'refs/heads/release/frota-standalone-20261014' && steps.version.outputs.already_released != 'true' && env.FROTA_DRIVE_CONFIGURED == 'true'
-        shell: bash
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq rclone
-        env:
-          FROTA_DRIVE_CONFIGURED: ${{ secrets.FROTA_GDRIVE_RCLONE_CONFIG != '' }}
       - name: Sincronizar instalador com Google Drive
         if: github.ref == 'refs/heads/release/frota-standalone-20261014' && steps.version.outputs.already_released != 'true'
         shell: pwsh
@@ -144,6 +137,8 @@ jobs:
             Write-Host 'Drive opcional nao configurado. GitHub Releases continua gratuito e funcional.'
             exit 0
           }
+          choco install rclone -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Nao foi possivel instalar rclone' }
           $config = Join-Path $env:RUNNER_TEMP 'frota-rclone.conf'
           [IO.File]::WriteAllText($config,$env:FROTA_GDRIVE_RCLONE_CONFIG)
           $remote = 'artisys-qa-drive'
