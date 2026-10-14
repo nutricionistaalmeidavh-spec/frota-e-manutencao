@@ -12,7 +12,7 @@ let mobileController;
 app.whenReady().then(async()=>{
   host=await createStandaloneHost({dataDir:join(app.getPath('userData'),'data')});
   mobileController=createMobileAccess({dataDir:join(app.getPath('userData'),'data'),distDir:join(here,'../dist'),backend:host.backend});
-  const requireDesktopSession=async(auth)=>{if(!auth?.sessionId||!auth?.token)throw Error('Entre no Windows para liberar o celular.');await host.backend.validate(auth)};
+  const requireDesktopSession=async(auth)=>{if(!auth?.sessionId||!auth?.token)throw Error('Entre no Windows para liberar o celular.');const session=await host.backend.validate(auth);if(!session?.user?.roles?.includes('admin'))throw Error('Somente administradores podem ativar acesso pelo celular.')};
   for(const name of ['status','start','newCode','stop'])ipcMain.handle('artisys:mobile:'+name,async(_event,{auth})=>{await requireDesktopSession(auth);return mobileController[name]()});
   for(const n of ['describe','authState','bootstrap','login','validate','logout','load','action'])
     ipcMain.handle(`artisys:${n}`,(_e,p)=>host.backend[n](p));
