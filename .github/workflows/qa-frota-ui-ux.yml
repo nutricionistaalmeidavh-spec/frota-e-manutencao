@@ -3,6 +3,8 @@ on:
   push:
     branches:
       - feat/frota-ui-ux-canonical-20261014
+    paths:
+      - qa/trigger-ui-ux.txt
   workflow_dispatch:
 permissions:
   contents: read
