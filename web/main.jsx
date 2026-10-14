@@ -69,6 +69,22 @@ const navSections=[
  {name:'MANUTENÇÃO',items:['preventive-plans','work-orders','schedule','inventory','checklists']},
  {name:'GESTÃO',items:['finance','reports','settings']}
 ];
+function actionTitle(screen,action,selected){
+ if(screen==='fleet'&&action==='save')return selected?'Editar veículo':'Novo veículo';
+ if(screen==='readings'&&action==='save')return 'Registrar leitura';
+ if(screen==='preventive-plans'&&action==='create')return 'Novo plano preventivo';
+ if(screen==='preventive-plans'&&action==='save')return 'Editar plano preventivo';
+ if(screen==='work-orders'&&action==='create')return 'Nova ordem de serviço';
+ if(screen==='checklists'&&action==='save')return selected?'Editar inspeção':'Nova inspeção';
+ return ACTION_LABELS[action]??action;
+}
+function actionSubmitLabel(screen,action,selected){
+ if(screen==='fleet'&&action==='save')return selected?'Salvar alterações':'Cadastrar veículo';
+ if(screen==='readings'&&action==='save')return 'Registrar leitura';
+ if(screen==='preventive-plans'&&action==='create')return 'Criar plano';
+ if(screen==='work-orders'&&action==='create')return 'Criar ordem de serviço';
+ return 'Confirmar '+(ACTION_LABELS[action]??action).toLocaleLowerCase('pt-BR');
+}
 const metrics=[
  ['vehicles','Veículos cadastrados',''],
  ['preventivePlans','Planos preventivos',''],
@@ -138,7 +154,7 @@ function App(){
    <button className="mobile-menu" type="button" onClick={()=>setMobileNav(v=>!v)} aria-label={mobileNav?'Fechar navegação':'Abrir navegação'}><Icon name="overview" size={18}/> Menu</button>
    {mobileNav&&<button className="nav-scrim" aria-label="Fechar navegação" onClick={()=>setMobileNav(false)}/>}
    <aside className={'sidebar '+(mobileNav?'sidebar-open':'')}>
-    <div className="sidebar-brand"><span className="brand-glyph">A</span><div><strong>ArtiSys</strong><small>FROTA & MANUTENÇÃO</small></div><span className="brand-version">PRO</span></div>
+    <div className="sidebar-brand"><span className="brand-glyph">A</span><div><strong>ArtiSys</strong><small>FROTA & MANUTENÇÃO</small></div></div>
     <div className="sidebar-caption">AMBIENTE DE TRABALHO</div>
     {sections.map(section=><div className="nav-group" key={section.name}><p>{section.name}</p>{section.items.map(id=><button key={id} data-testid={'nav-'+id} type="button" onClick={()=>navigate(id)} className={'nav-link '+(id===screen?'on':'')} aria-current={id===screen?'page':undefined}><span className="nav-icon"><Icon name={id} size={18}/></span>{meta.navigation.find(x=>x.id===id)?.label??id}</button>)}</div>)}
     <div className="sidebar-footer"><span className="status-light"/> <span>Armazenamento neste dispositivo</span></div>
@@ -171,14 +187,14 @@ function App(){
        </>}
     </main>
    </div>
-   {panel&&<div className="overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closePanel()}}><section className="form-panel" role="dialog" aria-modal="true" aria-labelledby="form-heading"><div className="form-head"><div><span className="eyebrow">ALTERAR DADOS</span><h2 id="form-heading">{ACTION_LABELS[panel]??panel}</h2><p>{selected?'Registro: '+recordId(selected):'Preencha os campos e confirme a ação.'}</p></div><button className="close" aria-label="Fechar formulário" type="button" disabled={busy} onClick={closePanel}><Icon name="close" size={19}/></button></div>
+   {panel&&<div className="overlay" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)closePanel()}}><section className="form-panel" role="dialog" aria-modal="true" aria-labelledby="form-heading"><div className="form-head"><div><span className="eyebrow">ALTERAR DADOS</span><h2 id="form-heading">{actionTitle(screen,panel,selected)}</h2><p>{selected?'Registro: '+recordId(selected):'Preencha os campos e confirme a ação.'}</p></div><button className="close" aria-label="Fechar formulário" type="button" disabled={busy} onClick={closePanel}><Icon name="close" size={19}/></button></div>
     <form onSubmit={submitAction}><div className="field-grid">{actionFields.length? actionFields.map(field=><label key={field.key} className={field.type==='textarea'?'wide-field':''}><span>{field.label}{field.required?' *':''}</span>{field.type==='textarea'?<textarea rows={4} value={draft[field.key]??''} onChange={e=>setDraft(d=>({...d,[field.key]:e.target.value}))}/>:
        field.type==='select'?<select value={draft[field.key]??''} required={field.required} onChange={e=>setDraft(d=>({...d,[field.key]:e.target.value,...(field.key==='trigger.metric'?{'trigger.baseline':''}:{})}))}>{!field.options?.length&&<option value="">Nenhuma opção disponível</option>}{(field.options??[]).map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select>:
        <input data-testid={'field-'+field.key.replaceAll('.','-')} type={field.type==='baseline'?(draft['trigger.metric']==='calendar-days'?'date':'number'):field.type==='money'||field.type==='number'?'number':field.type==='date'?'date':'text'} step={field.type==='money'?'0.01':field.type==='number'||field.type==='baseline'?'any':undefined} min={field.min} required={field.required} readOnly={field.readOnly} placeholder={field.placeholder} value={draft[field.key]??''} onChange={e=>setDraft(d=>({...d,[field.key]:e.target.value}))}/>
        }</label>):<p className="wide-field">Esta operação não exige informações adicionais.</p>}</div>
        {isDestructive(screen,panel)&&<p className="destructive-note">A operação pode alterar dados existentes. Haverá uma confirmação antes de executar.</p>}
        {error&&<p className="error-text" role="alert">{error}</p>}
-       <div className="form-actions"><button className="secondary" type="button" disabled={busy} onClick={closePanel}>Voltar</button><button className={isDestructive(screen,panel)?'danger-button':'primary'} type="submit" disabled={busy||actionFields.some(f=>f.required&&f.type==='select'&&!(f.options?.length))}>{busy?'Salvando…':'Confirmar '+(ACTION_LABELS[panel]??panel).toLocaleLowerCase('pt-BR')}</button></div>
+       <div className="form-actions"><button className="secondary" type="button" disabled={busy} onClick={closePanel}>Voltar</button><button className={isDestructive(screen,panel)?'danger-button':'primary'} type="submit" disabled={busy||actionFields.some(f=>f.required&&f.type==='select'&&!(f.options?.length))}>{busy?'Salvando…':actionSubmitLabel(screen,panel,selected)}</button></div>
     </form></section></div>}
  </div>;
 }
