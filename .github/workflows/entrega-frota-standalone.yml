@@ -42,9 +42,9 @@ jobs:
           if-no-files-found: warn
       - name: Gerar instalador do repositorio independente
         run: |
-          npm run build:web
+          node -e "const fs=require('fs');const p=require('./package.json');p.build.compression='maximum';p.build.afterPack='.release/electron-afterpack.cjs';fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npx electron-builder --win nsis --x64 --publish never -c.afterPack=.release/electron-afterpack.cjs -c.compression=maximum
+          npm run build:win
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Gerar manifest e validar o instalador
         shell: pwsh
