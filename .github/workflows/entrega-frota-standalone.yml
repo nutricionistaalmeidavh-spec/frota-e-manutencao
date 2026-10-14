@@ -116,8 +116,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release view $env:RELEASE_TAG *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $env:RELEASE_TAG ja existe. Nao sobrescrever." }
+          $releasesJson = gh release list --json tagName --limit 100
+          if ($LASTEXITCODE -ne 0) { throw 'Nao foi possivel consultar as releases existentes.' }
+          $existing = @($releasesJson | ConvertFrom-Json | Where-Object { $_.tagName -eq $env:RELEASE_TAG })
+          if ($existing.Count -gt 0) { throw "Release $env:RELEASE_TAG ja existe. Nao sobrescrever." }
       - name: Criar GitHub Release em rascunho
         if: github.ref == 'refs/heads/main' && steps.version.outputs.already_released != 'true'
         env:
