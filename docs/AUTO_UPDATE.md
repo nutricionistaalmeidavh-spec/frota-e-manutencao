@@ -1,22 +1,25 @@
-# Atualizacoes do ArtiSys Frota (Windows)
+# Atualização automática ArtiSys Frota — mesmo modelo do ArtiSys PDV
 
-O codigo-fonte permanece no repositorio **privado**. O instalador usa Electron/NSIS e `electron-updater` (open source). Nao inclua token do GitHub ou credenciais de armazenamento no aplicativo. O banco continua em `app.getPath('userData')/data`, e o updater cria backup local **antes** de encerrar para instalar.
+O projeto é público em https://github.com/nutricionistaalmeidavh-spec/frota-e-manutencao. O canal gratuito de atualização é a área **GitHub Releases deste próprio repositório**, sem hospedagem paga, SSH ou outro repo. O Electron NSIS embute somente owner/repo públicos no `app-update.yml`. Nenhum token vai ao desktop.
 
-## Configuracao do canal
+## Para o operador
+O aplicativo verifica novidades ao iniciar e a cada 6 horas. Se houver versão nova, exibe "Baixar agora"; depois de baixar, "Atualizar e reiniciar". O usuário também pode escolher "Depois". Nunca força download ou reinicialização. Antes de instalar, faz backup local obrigatório e fecha o banco de forma controlada. Dados, usuários e backups permanecem em `app.getPath('userData')/data`; não ficam no diretório de instalação.
 
-1. Disponibilize um diretorio **HTTPS** estatico acessivel pelos clientes (servidor proprio com Caddy/Nginx, ou espelhamento gratuito de binarios em repositorio publico separado). Os arquivos nao devem requerer autenticar cliente.
-2. Na configuracao **Variables** do repositorio GitHub, crie `FROTA_UPDATE_FEED_URL` contendo a URL publica do diretorio, sem token e sem query. E opcional: sem ela, o instalador funciona normalmente mas **nao** verifica atualizacoes.
-3. Gere um build a partir da branch `release/frota-standalone-20261014`. O Actions valida QA, instala dependencias, executa Playwright e cria EXE, blockmap e latest.yml.
-4. Publique no mesmo diretorio **o exe, o .blockmap e o latest.yml desse unico build**. Para evitar cliente baixar arquivo incompleto, envie EXE e blockmap primeiro; publique `latest.yml` por ultimo/atomicamente. Pode ser feito por CI via SSH em servidor proprio. Nao misture metadados de builds distintos.
-5. Para envio automático ao seu servidor na publicação por tag, configure os secrets SSH do repositório: `FROTA_SSH_HOST`, `FROTA_SSH_USER`, `FROTA_SSH_PATH` (diretório absoluto), `FROTA_SSH_PRIVATE_KEY` e `FROTA_SSH_KNOWN_HOSTS`. O servidor precisa de OpenSSH/SCP e permissões de escrita no diretório. Nenhum desses segredos deve ser incorporado ao instalador. A publicação aborta se algum estiver ausente.
-6. Confirme a URL `.../latest.yml` e os downloads dos arquivos, instale esta versao para habilitar atualizacoes futuras, e entao publique uma versao numericamente maior. Atualizacoes sao verificadas ao iniciar e a cada 6 horas, baixadas automaticamente; o usuario confirma a instalacao. O aplicativo nao instala se o backup falhar.
+## Publicação
 
-**Importante:** a versao anterior `1.0.0-migration.8` nao inclui o updater: quem ja a instalou precisa instalar **uma vez** o novo setup para receber atualizacoes futuras.
+Um push em `release/frota-standalone-20261014` dispara o workflow **Validar e empacotar Frota independente**:
+1. Resolve versão estável automaticamente: no mínimo `package.json`, um patch acima da última GitHub Release.
+2. Executa testes e QA visual com Chromium.
+3. Compila NSIS, verifica EXE, `latest.yml`, `*.blockmap` e SHA256.
+4. Faz upload de artefatos e publica **GitHub Release** `frota-vX.Y.Z` somente após os gates verdes. Não republica release já existente para outro commit.
+5. Sincroniza opcionalmente o Google Drive via `rclone` quando o secret `FROTA_GDRIVE_RCLONE_CONFIG` estiver disponível. A falta desse secret não interrompe a atualização via GitHub Releases, mas deixa o Drive sem sincronização automática.
 
-## Controle de publicacao
+Para a sincronização Drive no Actions, configurar apenas o secret `FROTA_GDRIVE_RCLONE_CONFIG` (credenciais de rclone da própria conta), caso desejado. A pasta está definida no arquivo de release e o pipeline mantém uma pasta de versões anteriores. Nunca expor credenciais ou `rclone.conf` no repositório ou instalador.
 
-- O workflow **nao** publica builds em servidores externos sem configuracao explicita.
-- `--publish never` impede publicacao implicita por electron-builder.
-- Build e artefatos do Actions nao sao o mesmo que um canal de atualizacao permanente.
-- GitHub Releases **privadas** podem servir para distribuicao interna, mas nao sao um feed publico para clientes nao autenticados.
-- Para uma publicacao de clientes, mantenha `latest.yml` e instaladores em armazenamento com historico/retencao e HTTPS. Cloudflare R2 e outros servicos sao **opcionais** (limites de gratuidade se aplicam); nenhum e obrigatorio no core.
+A versão `1.0.0-migration.8` foi produzida sem updater; clientes que ainda a utilizam precisam instalar manualmente uma versão que já traga o updater. A atualização remota começa **após uma release pública publicada e um cliente instalado com metadados embutidos**.
+
+### Segurança operacional
+- Nada executa `git pull` no computador do cliente. Git é fonte, o cliente baixa apenas instaladores publicados após QA.
+- `electron-builder --publish never` impede publicação oculta. A etapa explícita de GitHub Releases publica apenas quando o pipeline aprovou.
+- Não modifica schema por causa do updater, não troca os dados em userData e preserva backups.
+- GitHub Releases e Google Drive estão sujeitos a políticas e limites gratuitos próprios; o core continua open source e gratuito.
