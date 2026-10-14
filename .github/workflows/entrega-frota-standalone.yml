@@ -1,0 +1,52 @@
+name: Validar e empacotar Frota independente
+on:
+  push:
+    branches: [release/frota-standalone-20261014]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  standalone-windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependencias
+        run: npm install --no-audit --no-fund
+      - name: Validar importacoes, testes, compilacao
+        run: npm run check
+      - name: Preparar Chromium Playwright
+        run: npx playwright install chromium
+      - name: QA funcional e visual completo
+        run: npm run phase5
+      - name: Gerar instalador do repositorio independente
+        run: npm run build:win
+      - name: Gerar manifest e validar o instalador
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem release -Filter 'ArtiSys-Frota-Setup-*.exe' -File | Select-Object -First 1
+          if (-not $file) { throw 'Instalador nao encontrado' }
+          $bytes = [IO.File]::ReadAllBytes($file.FullName)
+          if ($bytes.Length -lt 1000000 -or $bytes[0] -ne 77 -or $bytes[1] -ne 90) { throw 'EXE invalido' }
+          $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLowerInvariant()
+          "$hash  $($file.Name)" | Set-Content -Encoding ascii release/SHA256SUMS.txt
+          $manifest = @{product='fleet-maintenance'; repository='frota-e-manutencao'; ref=$env:GITHUB_SHA; file=$file.Name; sizeBytes=$file.Length; sha256=$hash; tested='phase5'; legacyDatabaseCertification='not-run-no-legacy-db'} | ConvertTo-Json
+          $manifest | Set-Content -Encoding utf8 release/DELIVERY-MANIFEST.json
+          Write-Host "INSTALLER=$($file.Name) SIZE=$($file.Length) SHA256=$hash"
+      - name: Enviar instalador com hash e resultados
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArtiSys-Frota-Standalone-Windows
+          path: |
+            release/ArtiSys-Frota-Setup-*.exe
+            release/SHA256SUMS.txt
+            release/DELIVERY-MANIFEST.json
+            qa-artifacts/phase5-summary.json
+            qa-artifacts/playwright-summary.json
+          retention-days: 7
+          if-no-files-found: error
