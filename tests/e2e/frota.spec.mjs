@@ -24,7 +24,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await expect(page.getByText('1.100')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('13-leitura-atualizada.png'),fullPage:true});
  await page.getByTestId('nav-fleet').click();
- await expect(page.getByText('ABC1D23')).toBeVisible();
+ await expect(page.locator('tbody tr')).toContainText('ABC1D23');
  await expect(page.getByText('1.100')).toBeVisible();
 });
 test('backup persiste ao atualizar a página',async({page})=>{
