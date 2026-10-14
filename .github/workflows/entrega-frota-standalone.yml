@@ -1,15 +1,20 @@
 name: Validar e empacotar Frota independente
 on:
   push:
-    branches: [release/frota-standalone-20261014]
-    tags: ['frota-v*']
+    branches: [release/frota-standalone-20261014, feat/frota-update-pdv-pattern-20261014]
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: frota-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   standalone-windows:
     runs-on: windows-latest
     timeout-minutes: 90
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,12 +22,27 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validar tag da versao
-        if: startsWith(github.ref, 'refs/tags/frota-v')
+      - name: Resolver versao automatica de release
+        id: version
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          $expected = "frota-v$(node -p "require('./package.json').version")"
-          if ($env:GITHUB_REF_NAME -ne $expected) { throw "Tag incorreta: esperado $expected" }
+          $base = node -p "require('./package.json').version"
+          $latestTag = ''
+          if ($env:GITHUB_REF -eq 'refs/heads/release/frota-standalone-20261014') {
+            $raw = & gh api "repos/$env:GITHUB_REPOSITORY/releases?per_page=30"
+            if ($LASTEXITCODE -ne 0) { throw 'Falha ao verificar versoes publicadas no GitHub.' }
+            $releases = $raw | ConvertFrom-Json
+            $previous = $releases | Where-Object { -not $_.draft -and -not $_.prerelease -and $_.tag_name -match '^frota-v\d+\.\d+\.\d+$' } | Select-Object -First 1
+            if ($previous) { $latestTag = [string]$previous.tag_name }
+          }
+          $version = (node tooling/release-version.mjs $base $latestTag).Trim()
+          if ($LASTEXITCODE -ne 0 -or -not $version) { throw 'Versao de release invalida' }
+          npm version $version --no-git-tag-version --allow-same-version
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao preparar a versao' }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Versao validada: $version"
       - name: Instalar dependencias
         run: npm install --no-audit --no-fund
       - name: Validar importacoes, testes, compilacao
@@ -47,33 +67,27 @@ jobs:
             qa-artifacts/playwright-summary.json
           retention-days: 3
           if-no-files-found: warn
-      - name: Preparar build e canal de atualizacoes
-        env:
-          FROTA_UPDATE_FEED_URL: ${{ vars.FROTA_UPDATE_FEED_URL }}
+      - name: Preparar build com GitHub Releases publico
         run: node tooling/prepare-update-build.mjs
       - name: Gerar instalador standalone NSIS
         run: npm run build:win
-      - name: Gerar manifest e validar instalador e updater
+      - name: Validar instalador, latest.yml e hash
         shell: pwsh
-        env:
-          FROTA_UPDATE_FEED_URL: ${{ vars.FROTA_UPDATE_FEED_URL }}
         run: |
           $file = Get-ChildItem release -Filter 'ArtiSys-Frota-Setup-*.exe' -File | Select-Object -First 1
           if (-not $file) { throw 'Instalador nao encontrado' }
+          if (-not (Test-Path release/latest.yml)) { throw 'latest.yml nao gerado' }
+          if (-not (Get-ChildItem release -Filter '*.blockmap')) { throw 'NSIS blockmap nao gerado' }
           $stream = [IO.File]::OpenRead($file.FullName)
           try { $header = New-Object byte[] 2; [void]$stream.Read($header,0,2) }
           finally { $stream.Dispose() }
           if ($file.Length -lt 1000000 -or $header[0] -ne 77 -or $header[1] -ne 90) { throw 'EXE invalido' }
-          if ($env:FROTA_UPDATE_FEED_URL) {
-            if (-not (Test-Path release/latest.yml)) { throw 'latest.yml nao gerado para canal de atualizacao' }
-            if (-not (Get-ChildItem release -Filter '*.blockmap')) { throw 'NSIS blockmap nao gerado' }
-          }
           $hash = (Get-FileHash -Algorithm SHA256 $file.FullName).Hash.ToLowerInvariant()
           "$hash  $($file.Name)" | Set-Content -Encoding ascii release/SHA256SUMS.txt
-          $manifest = @{product='fleet-maintenance';repository='frota-e-manutencao';ref=$env:GITHUB_SHA;version=(node -p "require('./package.json').version");file=$file.Name;sizeBytes=$file.Length;sha256=$hash;tested='phase5';feedConfigured=[bool]$env:FROTA_UPDATE_FEED_URL;legacyDatabaseCertification='not-run-no-legacy-db'} | ConvertTo-Json
+          $manifest = @{product='fleet-maintenance';repository=$env:GITHUB_REPOSITORY;commit=$env:GITHUB_SHA;version=(node -p "require('./package.json').version");file=$file.Name;sizeBytes=$file.Length;sha256=$hash;tested='phase5';updateProvider='github';legacyDatabaseCertification='not-run-no-legacy-db'} | ConvertTo-Json
           $manifest | Set-Content -Encoding utf8 release/DELIVERY-MANIFEST.json
           Write-Host "INSTALLER=$($file.Name) SIZE=$($file.Length) SHA256=$hash"
-      - name: Enviar instalador com hash e resultados
+      - name: Enviar instalador e evidencias
         uses: actions/upload-artifact@v4
         with:
           name: ArtiSys-Frota-Standalone-Windows
@@ -85,46 +99,74 @@ jobs:
             release/DELIVERY-MANIFEST.json
             qa-artifacts/phase5-summary.json
             qa-artifacts/playwright-summary.json
-          retention-days: 7
+          retention-days: 30
           if-no-files-found: error
-      - name: Publicar em servidor proprio no lancamento por tag
-        if: startsWith(github.ref, 'refs/tags/frota-v')
-        shell: pwsh
-        env:
-          FROTA_UPDATE_FEED_URL: ${{ vars.FROTA_UPDATE_FEED_URL }}
-          FROTA_SSH_HOST: ${{ secrets.FROTA_SSH_HOST }}
-          FROTA_SSH_USER: ${{ secrets.FROTA_SSH_USER }}
-          FROTA_SSH_PATH: ${{ secrets.FROTA_SSH_PATH }}
-          FROTA_SSH_PRIVATE_KEY: ${{ secrets.FROTA_SSH_PRIVATE_KEY }}
-          FROTA_SSH_KNOWN_HOSTS: ${{ secrets.FROTA_SSH_KNOWN_HOSTS }}
+
+  publish-release:
+    if: github.ref == 'refs/heads/release/frota-standalone-20261014' && github.event_name == 'push'
+    needs: standalone-windows
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ArtiSys-Frota-Standalone-Windows
+          path: release-assets
+      - name: Conferir artefatos do mesmo commit
+        shell: bash
         run: |
-          if (-not $env:FROTA_UPDATE_FEED_URL) { throw 'Defina FROTA_UPDATE_FEED_URL antes de publicar uma tag' }
-          foreach ($key in @('FROTA_SSH_HOST','FROTA_SSH_USER','FROTA_SSH_PATH','FROTA_SSH_PRIVATE_KEY','FROTA_SSH_KNOWN_HOSTS')) {
-            if (-not [Environment]::GetEnvironmentVariable($key)) { throw "Secret ausente: $key" }
-          }
-          if ($env:FROTA_SSH_HOST -notmatch '^[A-Za-z0-9.-]+$' -or $env:FROTA_SSH_USER -notmatch '^[A-Za-z0-9_-]+$' -or $env:FROTA_SSH_PATH -notmatch '^/[A-Za-z0-9/_-]+$') { throw 'Host, usuario ou caminho SSH invalidos' }
-          $dir = Join-Path $env:RUNNER_TEMP 'frota-ssh'
-          New-Item -ItemType Directory -Force $dir | Out-Null
-          $keyFile = Join-Path $dir 'id_ed25519'
-          $knownFile = Join-Path $dir 'known_hosts'
-          [IO.File]::WriteAllText($keyFile,($env:FROTA_SSH_PRIVATE_KEY -replace '\\n',"`n"))
-          [IO.File]::WriteAllText($knownFile,$env:FROTA_SSH_KNOWN_HOSTS)
-          $remote = "$($env:FROTA_SSH_USER)@$($env:FROTA_SSH_HOST):$($env:FROTA_SSH_PATH)"
-          $opts = @('-i',$keyFile,'-o','StrictHostKeyChecking=yes','-o',"UserKnownHostsFile=$knownFile")
-          foreach ($file in @(Get-ChildItem release -File | Where-Object { $_.Name -like 'ArtiSys-Frota-Setup-*.exe' -or $_.Name -like '*.blockmap' })) {
-            & scp @opts $file.FullName "$remote/"
-            if ($LASTEXITCODE -ne 0) { throw "Falha no envio $($file.Name)" }
-          }
-          & scp @opts release/latest.yml "$remote/latest.yml.pending"
-          if ($LASTEXITCODE -ne 0) { throw 'Falha no upload do manifesto' }
-          & ssh @opts "$($env:FROTA_SSH_USER)@$($env:FROTA_SSH_HOST)" "mv $($env:FROTA_SSH_PATH)/latest.yml.pending $($env:FROTA_SSH_PATH)/latest.yml"
-          if ($LASTEXITCODE -ne 0) { throw 'Falha ao ativar o manifesto' }
-      - name: Criar GitHub Release interna apos publicacao
-        if: startsWith(github.ref, 'refs/tags/frota-v')
-        shell: pwsh
+          set -euo pipefail
+          VERSION="${{ needs.standalone-windows.outputs.version }}"
+          test -n "$VERSION"
+          test -s release-assets/latest.yml
+          test -s release-assets/SHA256SUMS.txt
+          test -s release-assets/DELIVERY-MANIFEST.json
+          test "$(find release-assets -maxdepth 1 -name 'ArtiSys-Frota-Setup-*.exe' | wc -l)" -eq 1
+          test "$(find release-assets -maxdepth 1 -name '*.blockmap' | wc -l)" -ge 1
+          grep -Fq "ArtiSys-Frota-Setup-${VERSION}.exe" release-assets/SHA256SUMS.txt
+          sha256sum -c release-assets/SHA256SUMS.txt --ignore-missing
+          jq -e --arg sha "$GITHUB_SHA" --arg version "$VERSION" '.commit == $sha and .version == $version and .updateProvider == "github"' release-assets/DELIVERY-MANIFEST.json
+      - name: Sincronizar instalador com Google Drive (opcional)
+        shell: bash
+        env:
+          FROTA_GDRIVE_RCLONE_CONFIG: ${{ secrets.FROTA_GDRIVE_RCLONE_CONFIG }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${FROTA_GDRIVE_RCLONE_CONFIG:-}" ]]; then
+            echo "::notice::Sincronizacao com Drive desabilitada: configurar FROTA_GDRIVE_RCLONE_CONFIG somente se desejado."
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq rclone
+          CONF="$RUNNER_TEMP/frota-rclone.conf"
+          printf '%s' "$FROTA_GDRIVE_RCLONE_CONFIG" > "$CONF"
+          chmod 600 "$CONF"
+          REMOTE='artisys-qa-drive'
+          ROOT='1hv_RUXwq_C1Z5Pw9M0xX9cJjzJY8arhZ'
+          FLAGS=(--config "$CONF" --drive-root-folder-id "$ROOT")
+          rclone listremotes --config "$CONF" | grep -Fx "${REMOTE}:"
+          FILE="$(find release-assets -maxdepth 1 -name 'ArtiSys-Frota-Setup-*.exe' -print -quit)"
+          VERSION="${{ needs.standalone-windows.outputs.version }}"
+          STAGE=".frota-release-staging/${VERSION}-${GITHUB_RUN_ID}"
+          rclone mkdir "${REMOTE}:Anterior" "${FLAGS[@]}"
+          rclone copyto "$FILE" "${REMOTE}:${STAGE}/$(basename "$FILE")" "${FLAGS[@]" --checksum
+          rclone check "$(dirname "$FILE")" "${REMOTE}:${STAGE}" "${FLAGS[@]}" --include "$(basename "$FILE")" --one-way
+          rclone copyto "$FILE" "${REMOTE}:ArtiSys-Frota-Setup-Windows.exe" "${FLAGS[@]}" --checksum
+          rclone check "$(dirname "$FILE")" "${REMOTE}:" "${FLAGS[@]}" --include "ArtiSys-Frota-Setup-Windows.exe" --one-way --size-only
+          rclone purge "${REMOTE}:${STAGE}" "${FLAGS[@]}" || true
+          echo "Drive: ArtiSys-Frota-Setup-Windows.exe sincronizado."
+      - name: Publicar GitHub Release para o updater
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $files = @(Get-ChildItem release -File | Where-Object { $_.Name -like 'ArtiSys-Frota-Setup-*.exe' -or $_.Name -like '*.blockmap' -or $_.Name -eq 'latest.yml' -or $_.Name -eq 'SHA256SUMS.txt' })
-          & gh release create $env:GITHUB_REF_NAME @($files | ForEach-Object FullName) --title "ArtiSys Frota $env:GITHUB_REF_NAME" --generate-notes
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          set -euo pipefail
+          TAG="frota-v${{ needs.standalone-windows.outputs.version }}"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A release $TAG ja existe. Nao sobrescrever versoes publicadas."
+            exit 1
+          fi
+          gh release create "$TAG" release-assets/ArtiSys-Frota-Setup-*.exe release-assets/*.blockmap release-assets/latest.yml release-assets/SHA256SUMS.txt release-assets/DELIVERY-MANIFEST.json \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "ArtiSys Frota ${{ needs.standalone-windows.outputs.version }}" \
+            --notes "Build Windows validado por testes, QA funcional/visual, metadados de update e SHA-256. Atualizacao sob comando do operador, backup local antes da instalacao." --latest
