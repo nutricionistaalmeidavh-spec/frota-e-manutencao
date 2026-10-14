@@ -8,6 +8,7 @@ import{ACTION_LABELS,allowedActions,buildActionInput,defaultDraft,getActionField
 import{Icon}from'./icons.jsx';
 import'./styles.css';
 import'./premium.css';
+import{UpdaterPanel}from'./updater.jsx';
 
 async function makeBackend(){
  if(globalThis.artisys)return globalThis.artisys;
@@ -198,4 +199,4 @@ function App(){
     </form></section></div>}
  </div>;
 }
-createRoot(document.getElementById('root')).render(<App/>);
+createRoot(document.getElementById('root')).render(<><App/><UpdaterPanel/></>);
