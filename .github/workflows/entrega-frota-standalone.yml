@@ -41,7 +41,11 @@ jobs:
           retention-days: 3
           if-no-files-found: warn
       - name: Gerar instalador do repositorio independente
-        run: npm run build:win
+        run: |
+          npm run build:web
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npx electron-builder --win nsis --x64 --publish never -c.afterPack=.release/electron-afterpack.cjs -c.compression=maximum
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Gerar manifest e validar o instalador
         shell: pwsh
         run: |
