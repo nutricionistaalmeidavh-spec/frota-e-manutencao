@@ -6,7 +6,7 @@ export function resolvePublicReleaseChannel(value = PUBLIC_RELEASE_REPOSITORY) {
   if (!/^[A-Za-z\d](?:[A-Za-z\d-]{0,38})\/[A-Za-z\d_.-]+$/.test(input))
     throw new Error('Informe o repositorio publico como owner/repo, sem URL, token ou query.');
   const [owner,repo] = input.split('/');
-  return {provider:'github',owner,repo};
+  return {provider:'github',owner,repo,tagNamePrefix:'frota-v'};
 }
 
 export function shouldEnableUpdater({isPackaged, manifestPresent}) {

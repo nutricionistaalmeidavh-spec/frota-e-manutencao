@@ -6,7 +6,7 @@ import {nextStableReleaseVersion} from '../tooling/release-version.mjs';
 
 test('canal utiliza o proprio repositorio publico da Frota',()=>{
   assert.deepEqual(resolvePublicReleaseChannel(),{
-    provider:'github',owner:'nutricionistaalmeidavh-spec',repo:'frota-e-manutencao'
+    provider:'github',owner:'nutricionistaalmeidavh-spec',repo:'frota-e-manutencao',tagNamePrefix:'frota-v'
   });
   assert.throws(()=>resolvePublicReleaseChannel('https://github.com/owner/repo'),/owner\/repo/i);
   assert.throws(()=>resolvePublicReleaseChannel('owner/repo?token=x'),/owner\/repo/i);

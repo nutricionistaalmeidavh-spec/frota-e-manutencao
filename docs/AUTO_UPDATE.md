@@ -23,3 +23,5 @@ A versão `1.0.0-migration.8` foi produzida sem updater; clientes que ainda a ut
 - `electron-builder --publish never` impede publicação oculta. A etapa explícita de GitHub Releases publica apenas quando o pipeline aprovou.
 - Não modifica schema por causa do updater, não troca os dados em userData e preserva backups.
 - GitHub Releases e Google Drive estão sujeitos a políticas e limites gratuitos próprios; o core continua open source e gratuito.
+
+As tags de distribuicao usam o prefixo `frota-v` configurado explicitamente no provedor GitHub do instalador, por exemplo `frota-v1.0.3`.

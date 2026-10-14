@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {resolvePublicReleaseChannel,shouldEnableUpdater,UPDATE_CHECK_INTERVAL_MS} from '../electron/update-policy.mjs';
 
 test('canal publico do mesmo repositorio, sem servico pago ou token embutido',()=>{
-  assert.deepEqual(resolvePublicReleaseChannel(),{provider:'github',owner:'nutricionistaalmeidavh-spec',repo:'frota-e-manutencao'});
+  assert.deepEqual(resolvePublicReleaseChannel(),{provider:'github',owner:'nutricionistaalmeidavh-spec',repo:'frota-e-manutencao',tagNamePrefix:'frota-v'});
   assert.throws(()=>resolvePublicReleaseChannel('https://github.com/owner/repo'),/owner\/repo/i);
   assert.throws(()=>resolvePublicReleaseChannel('owner/repo?token=x'),/owner\/repo/i);
 });
