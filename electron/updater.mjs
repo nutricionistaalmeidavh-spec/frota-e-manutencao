@@ -42,8 +42,13 @@ export async function registerUpdater({app,ipcMain,getWindow,prepareInstall}) {
 
   const manifest = join(process.resourcesPath,'app-update.yml');
   if (!shouldEnableUpdater({isPackaged:app.isPackaged,manifestPresent:existsSync(manifest)})) return;
-  const module = await import('electron-updater');
-  updater = (module.default ?? module).autoUpdater;
+  try {
+    const module = await import('electron-updater');
+    updater = (module.default ?? module).autoUpdater;
+  } catch {
+    emit({phase:'error',message:'Atualizacoes indisponiveis nesta instalacao. O aplicativo continuara funcionando.'});
+    return;
+  }
   updater.autoDownload = true;
   updater.autoInstallOnAppQuit = false;
   updater.allowPrerelease = false;
