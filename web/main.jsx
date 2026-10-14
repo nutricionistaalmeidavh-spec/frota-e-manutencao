@@ -20,7 +20,7 @@ const getRows=(screen,data)=>{
  if(screen==='settings')return(data?.backups??[]).map(v=>({payload:v,id:v.id}));
  return data?.rows??[];
 };
-const recordId=(r)=>String(unwrap(r)?.assetId??unwrap(r)?.id??unwrap(r)?.sku??r?.id??'');
+const recordId=(r)=>String(unwrap(r)?.id??unwrap(r)?.assetId??unwrap(r)?.sku??r?.id??'');
 const shortDate=v=>{if(!v)return '—';const d=new Date(v);return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString('pt-BR')};
 const brl=v=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(v??0)/100);
 const numeric=v=>new Intl.NumberFormat('pt-BR',{maximumFractionDigits:2}).format(Number(v??0));
@@ -49,7 +49,7 @@ const columns={
  reports:[['type','Relatório emitido'],['issuedAt','Emissão'],['size','Tamanho']],
  settings:[['id','Cópia local'],['createdAt','Criada em']]
 };
-const columnValue=(row,key)=>key.split('.').reduce((o,k)=>o?.[k],unwrap(row));
+const columnValue=(row,key)=>key.split('.').reduce((o,k)=>o?.[k],key.startsWith('due.')?row:unwrap(row));
 function formatValue(value,key){
  if(key==='due.due')return value?'Vencida':'Em dia';
  if(key.includes('Minor'))return brl(value);
