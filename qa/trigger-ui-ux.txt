@@ -2,3 +2,5 @@ Frota UI/UX + canonicidade — validação final em 2026-10-14.
 Mudanças: formulários, navegação compacta, persistência de backup, contratos de dados, testes mobile e Playwright.
 
 Rodada final 2: checklist e seletores estáveis do Playwright.
+
+Segunda rodada: visual premium, ícones, tokens e estado de formulário. QA final solicitado.
