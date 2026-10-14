@@ -13,7 +13,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await page.getByTestId('field-hourmeter').fill('11');
  await page.getByRole('button',{name:'Confirmar salvar'}).click();
  await expect(page.getByRole('status').filter({hasText:'Salvar concluído'})).toBeVisible();
- await expect(page.getByText('ABC1D23')).toBeVisible();
+ await expect(page.locator('tbody tr')).toContainText('ABC1D23');
  await page.screenshot({path:testInfo.outputPath('12-frota-com-registro.png'),fullPage:true});
  await page.getByTestId('nav-readings').click();
  await page.getByRole('button',{name:'Ver detalhes de v-e2e'}).click();
