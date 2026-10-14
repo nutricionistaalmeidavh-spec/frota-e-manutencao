@@ -11,7 +11,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await page.getByTestId('field-plate').fill('abc1d23');
  await page.getByTestId('field-odometer').fill('1000');
  await page.getByTestId('field-hourmeter').fill('11');
- await page.getByRole('button',{name:'Confirmar salvar'}).click();
+ await page.getByRole('button',{name:'Cadastrar veículo'}).click();
  await expect(page.getByRole('status').filter({hasText:'Salvar concluído'})).toBeVisible();
  await expect(page.locator('tbody tr')).toContainText('ABC1D23');
  await page.screenshot({path:testInfo.outputPath('12-frota-com-registro.png'),fullPage:true});
@@ -20,7 +20,7 @@ test('primeiro acesso, cadastro, edição e leitura mantêm o mesmo veículo',as
  await page.getByRole('button',{name:'Salvar',exact:true}).click();
  await page.getByTestId('field-odometer').fill('1100');
  await page.getByTestId('field-hourmeter').fill('12');
- await page.getByRole('button',{name:'Confirmar salvar'}).click();
+ await page.getByRole('button',{name:'Registrar leitura'}).click();
  await expect(page.getByText('1.100')).toBeVisible();
  await page.screenshot({path:testInfo.outputPath('13-leitura-atualizada.png'),fullPage:true});
  await page.getByTestId('nav-fleet').click();
