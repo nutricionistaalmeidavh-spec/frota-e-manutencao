@@ -114,10 +114,15 @@ jobs:
         if: github.ref == 'refs/heads/release/frota-standalone-20261014' && steps.version.outputs.already_released != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
+        shell: bash
         run: |
-          gh release view $env:RELEASE_TAG *> $null
-          if ($LASTEXITCODE -eq 0) { throw "Release $env:RELEASE_TAG ja existe. Nao sobrescrever." }
+          set -euo pipefail
+          # A primeira release nao existe: consultar a colecao evita tratar 404 como erro.
+          RELEASES="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100")"
+          if jq -e --arg tag "$RELEASE_TAG" 'any(.[]; .tag_name == $tag)' <<< "$RELEASES" >/dev/null; then
+            echo "::error::Release $RELEASE_TAG ja existe. Nao sobrescrever."
+            exit 1
+          fi
       - name: Criar GitHub Release em rascunho
         if: github.ref == 'refs/heads/release/frota-standalone-20261014' && steps.version.outputs.already_released != 'true'
         env:
