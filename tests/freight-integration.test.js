@@ -29,6 +29,8 @@ test('frete usa veículo e motorista CANÔNICOS e impede despachar referências 
  const moving=await call('freights','dispatch',{id:'FRT-1',vehicleAssetId:'CAM-1',driverPartyId:'MOT-1',odometerStart:1200,expectedVersion:1});
  assert.equal(moving.payload.status,'in-transit');
  assert.equal(moving.payload.vehicleAssetId,createdVehicle.payload.assetId);
+ await call('freights','create',{id:'FRT-BUSY',customerPartyId:'CLI-1',origin:'X',destination:'Y',cargoDescription:'Outra carga',priceMinor:50000});
+ await assert.rejects(()=>call('freights','dispatch',{id:'FRT-BUSY',vehicleAssetId:'CAM-1',driverPartyId:'MOT-1',odometerStart:1200,expectedVersion:1}),/outra viagem|ocupad/i);
  const vehicle=await load('fleet');assert.equal(vehicle.rows.length,1);
  const drivers=await h.persistence.listRecords('fleet.drivers');assert.equal(drivers.length,1);
  assert.equal((await h.persistence.listRecords('freight.drivers')).length,0);
@@ -53,6 +55,9 @@ test('despesa de viagem gera um único lançamento financeiro canônico e alimen
  const csv=await call('reports','csv',{type:'freight-margin',rows:[{id:'FAKE',marginMinor:999999}]});
  assert.match(csv.content,/FRT-2/);
  assert.doesNotMatch(csv.content,/FAKE/);
+ const vehicleCost=await call('reports','csv',{type:'vehicle-cost'});
+ assert.match(vehicleCost.content,/CAM-2,0,15000,0/);
+ assert.equal(summary.rows[0].payload.expenses[0].description,'Pedágio');
  assert.equal((await h.persistence.listRecords('freight.finance')).length,0);
 }));
 
