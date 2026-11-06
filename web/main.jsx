@@ -59,7 +59,7 @@ const columns={
  schedule:[['id','OS'],['title','Descrição'],['assetId','Veículo'],['status','Situação'],['openedAt','Aberta em']],
  inventory:[['sku','Código da peça'],['onHand','Disponível + reservado'],['reserved','Reservado']],
  checklists:[['title','Inspeção'],['assetId','Veículo'],['status','Situação'],['notes','Observações']],
- finance:[['description','Despesa'],['allocation.id','Veículo'],['amountMinor','Valor'],['dueDate','Vencimento']],
+ finance:[['description','Lançamento'],['allocation.kind','Origem'],['allocation.id','Referência'],['amountMinor','Valor'],['dueDate','Vencimento']],
  reports:[['type','Relatório emitido'],['issuedAt','Emissão'],['size','Tamanho']],
  settings:[['id','Cópia local'],['createdAt','Criada em']]
 };
@@ -69,6 +69,7 @@ function formatValue(value,key){
  if(key.includes('Minor'))return brl(value);
  if(['createdAt','issuedAt','dueDate','openedAt','lastReadingAt','licenseExpiresAt','departedAt','completedAt'].includes(key))return shortDate(value);
  if(key==='trigger.metric')return({odometer:'Quilometragem',hourmeter:'Horímetro','calendar-days':'Dias corridos'})[value]??value;
+ if(key==='allocation.kind')return({freight:'Frete',vehicle:'Veículo'})[value]??value;
  if(key==='rateType')return({'fixed':'Fixo','per-km':'Por km','per-ton':'Por tonelada'})[value]??value;
  if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção',planned:'Planejado','in-transit':'Em viagem',inactive:'Inativo',active:'Ativo'})[value]??value;
  if(typeof value==='boolean')return value?'Sim':'Não';
@@ -111,7 +112,9 @@ const metrics=[
  ['openWorkOrders','Ordens em aberto',''],
  ['expiredDocuments','Documentos vencidos','warning'],
  ['fuelCostMinor','Custo combustível','money'],
- ['expenseMinor','Despesas registradas','money']
+ ['expenseMinor','Despesas registradas','money'],
+ ['plannedFreights','Fretes planejados',''],
+ ['inTransitFreights','Fretes em viagem','']
 ];
 function App(){
  const [backend,setBackend]=useState(null),[hasUsers,setHasUsers]=useState(null);
@@ -201,8 +204,8 @@ function App(){
        <section className="mission-board" aria-label="Situação da operação"><div className="mission-copy"><span className="mission-tag"><span className="pulse-dot"/>{Number(data?.cards?.maintenanceDue)>0?'MANUTENÇÃO EXIGE ATENÇÃO':Number(data?.cards?.openWorkOrders)>0?'SERVIÇOS EM ANDAMENTO':'PAINEL OPERACIONAL'}</span><h2>{Number(data?.cards?.maintenanceDue)>0?'Há manutenções a acompanhar':Number(data?.cards?.vehicles)>0?'Sua operação em uma visão.':'Comece pelo primeiro veículo.'}</h2><p>{Number(data?.cards?.maintenanceDue)>0?'Consulte os planos vencidos e organize as ordens de serviço.':Number(data?.cards?.vehicles)>0?'Acompanhe veículos, planos de manutenção, fretes e despesas em um só lugar.':'Cadastre um veículo para começar a controlar leituras, manutenção e custos.'}</p></div><div className="mission-figure"><span>VEÍCULOS NA FROTA</span><strong>{numeric(data?.cards?.vehicles)}</strong><button type="button" onClick={()=>navigate('fleet')}>Abrir frota <Icon name="arrow" size={16}/></button></div></section>
        <div className="group-title"><div><span className="eyebrow">CONTROLE DIÁRIO</span><h2>Visão operacional</h2></div><span className="scope-label">Registros deste dispositivo</span></div>
        <div className="metric-grid primary-metrics">{metrics.slice(0,4).map(([key,label,kind],index)=><article className={'metric-card '+(kind==='warning'&&Number(data?.cards?.[key])>0?'metric-alert':'')} key={key}><div className="metric-top"><span>{label}</span><Icon name={['fleet','preventive-plans','alert','work-orders'][index]} size={18}/></div><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{numeric(data?.cards?.[key])}</strong><small>{kind==='warning'&&Number(data?.cards?.[key])>0?'Requer acompanhamento':'Dados da operação'}</small></article>)}</div>
-       <div className="group-title group-title-secondary"><div><span className="eyebrow">SAÚDE DA GESTÃO</span><h2>Documentos e custos</h2></div></div>
-       <div className="secondary-metrics">{metrics.slice(4).map(([key,label,kind],index)=><article className="secondary-metric" key={key}><span className="secondary-icon"><Icon name={index===0?'alert':'finance'} size={18}/></span><div><span>{label}</span><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{kind==='money'?brl(data?.cards?.[key]):numeric(data?.cards?.[key])}</strong></div></article>)}</div>
+       <div className="group-title group-title-secondary"><div><span className="eyebrow">SAÚDE DA GESTÃO</span><h2>Documentos, custos e viagens</h2></div></div>
+       <div className="secondary-metrics">{metrics.slice(4).map(([key,label,kind],index)=><article className="secondary-metric" key={key}><span className="secondary-icon"><Icon name={index===0?'alert':index>=3?'freights':'finance'} size={18}/></span><div><span>{label}</span><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{kind==='money'?brl(data?.cards?.[key]):numeric(data?.cards?.[key])}</strong></div></article>)}</div>
        <section className="insight-panel"><div><span className="eyebrow">FLUXO DE TRABALHO</span><h2>{Number(data?.cards?.vehicles)>0?'Continue seu controle de frota':'Por onde começar?'}</h2><p>Do cadastro ao acompanhamento: cada registro alimenta os próximos passos do controle operacional.</p></div><div className="quick-actions"><button onClick={()=>navigate('fleet')}>Cadastrar ou consultar veículos <Icon name="arrow" size={17}/></button><button onClick={()=>navigate('preventive-plans')}>Acompanhar preventivas <Icon name="arrow" size={17}/></button><button onClick={()=>navigate('work-orders')}>Consultar ordens de serviço <Icon name="arrow" size={17}/></button></div></section>
        </div>}
        {screen!=='overview'&&<section className="content-panel"><div className="section-header"><div><h2>{screen==='inventory'?'Posição atual de estoque':screen==='reports'?'Emissões registradas':screen==='settings'?'Cópias de segurança':'Registros'}</h2><p>{allRows.length} registro{allRows.length===1?'':'s'} {search?'· '+filtered.length+' encontrado(s)':''}</p></div><div className="panel-actions">{allRows.length>0&&<label className="search-label"><span className="sr-only">Buscar registros</span><Icon name="search" size={16}/><input type="search" placeholder="Pesquisar nesta lista…" value={search} onChange={e=>setSearch(e.target.value)}/></label>}{actions.filter(a=>!selected||['create','addExpense','backup','csv','issue','receive'].includes(a)).slice(0,2).map(a=><button className={a==='save'||a==='create'||a==='addExpense'?'primary':'secondary'} key={a} onClick={()=>openAction(a)} type="button">{a==='save'&&screen==='fleet'&&!selected?'Novo veículo':a==='create'&&screen==='work-orders'?'Nova ordem de serviço':a==='create'&&screen==='preventive-plans'?'Novo plano preventivo':a==='create'&&screen==='freights'?'Novo frete':a==='save'&&screen==='drivers'?'Novo motorista':a==='save'&&screen==='freight-routes'?'Nova rota':a==='save'&&screen==='freight-contracts'?'Novo contrato':ACTION_LABELS[a]??a}</button>)}</div></div>
