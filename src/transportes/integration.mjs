@@ -37,8 +37,10 @@ export function createTransportIntegration({persistence,fleet,finance}){
   freights:{kind:'workflow',async load(){
    const [all,entries]=await Promise.all([orders.list(),finance.list()]);
    return {rows:all.map(record=>{
-    const expenseMinor=cost(entries.filter(e=>e.payload.direction==='expense'&&e.payload.allocation?.kind==='freight'&&e.payload.allocation.id===record.payload.id));
-    return {...record,payload:{...record.payload,expenseMinor,marginMinor:record.payload.priceMinor-expenseMinor}};
+    const expenses=entries.filter(e=>e.payload.direction==='expense'&&e.payload.allocation?.kind==='freight'&&e.payload.allocation.id===record.payload.id)
+     .map(e=>({id:e.payload.id,description:e.payload.description,category:e.payload.metadata?.category??'other',amountMinor:e.payload.amountMinor}));
+    const expenseMinor=expenses.reduce((sum,x)=>sum+x.amountMinor,0);
+    return {...record,payload:{...record.payload,expenses,expenseMinor,marginMinor:record.payload.priceMinor-expenseMinor}};
    })};
   },actions:{
    create:async input=>{
