@@ -6,12 +6,15 @@ export const ACTION_LABELS = Object.freeze({
   receive:'Entrada de estoque',consume:'Saída de estoque',reserve:'Reservar peças',
   release:'Liberar reserva',addExpense:'Registrar despesa',csv:'Exportar CSV',
   issue:'Registrar emissão',backup:'Criar cópia local',restore:'Restaurar cópia',
-  dispatch:'Iniciar viagem',event:'Atualizar andamento',incident:'Registrar ocorrência',tripExpense:'Despesa da viagem'
+  dispatch:'Iniciar viagem',event:'Atualizar andamento',incident:'Registrar ocorrência',tripExpense:'Despesa da viagem',install:'Instalar pneu',removeTire:'Retirar pneu'
 });
 export const REPORT_TYPES = [
   {value:'vehicle-cost',label:'Custos por veículo'},
   {value:'vehicle-documents',label:'Documentos da frota'},
-  {value:'freight-margin',label:'Resultado por viagem/frete'}
+  {value:'freight-margin',label:'Resultado por viagem/frete'},
+  {value:'maintenance-history',label:'Histórico de manutenção'},
+  {value:'fuel-consumption',label:'Abastecimentos e consumo'},
+  {value:'operating-cost',label:'Custos operacionais por veículo'}
 ];
 const f=(key,label,type='text',extra={})=>({key,label,type,...extra});
 const choice=(key,label,options,extra={})=>f(key,label,'select',{options,...extra});
@@ -21,7 +24,7 @@ const num=(key,label,extra={})=>f(key,label,'number',{min:0,...extra});
 const triggerTypes=[
  {value:'odometer',label:'Quilometragem (km)'},{value:'hourmeter',label:'Horímetro (h)'},{value:'calendar-days',label:'Dias corridos'}
 ];
-export function getActionFields(screen,action,{selected=null,vehicles=[],drivers=[],routes=[],contracts=[],backups=[]}={}){
+export function getActionFields(screen,action,{selected=null,vehicles=[],drivers=[],routes=[],contracts=[],plans=[],suppliers=[],backups=[]}={}){
  const vehicle=assetChoice(vehicles);
  if(screen==='fleet'&&action==='save')return [
   f('assetId','Código interno','text',{required:true,readOnly:!!selected,placeholder:'Ex.: CAM-001'}),
@@ -39,10 +42,12 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],drivers
   vehicle,choice('type','Tipo',[{value:'preventive',label:'Preventiva'},{value:'corrective',label:'Corretiva'}]),
   f('title','Título da OS','text',{required:true,placeholder:'Ex.: Revisão dos freios'}),
   choice('priority','Prioridade',[{value:'normal',label:'Normal'},{value:'high',label:'Alta'},{value:'urgent',label:'Urgente'}]),
-  f('reportedIssue','Descrição do serviço','textarea',{required:false})
+  f('reportedIssue','Descrição do serviço','textarea',{required:false}),
+  choice('sourceRef','Plano preventivo (para OS preventiva)',[{value:'',label:'Não vincular (OS corretiva)'},...plans.map(p=>({value:p.id,label:p.name+' · '+p.assetId}))])
  ];
  if(screen==='work-orders'&&action==='addItem')return [
   choice('item.type','Tipo de item',[{value:'part',label:'Peça'},{value:'service',label:'Serviço'}]),
+  f('item.sku','Código da peça (SKU) — para peças','text'),
   f('item.description','Descrição','text',{required:true}),num('item.quantity','Quantidade',{required:true,min:0.001}),
   money('item.unitCostMinor','Custo unitário (R$)')
  ];
@@ -114,6 +119,37 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],drivers
   f('proofDocumentRef','Referência do comprovante de entrega','text')
  ];
  if(screen==='freights'&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
+ if(screen==='suppliers'&&action==='save')return [
+  f('partyId','Código do fornecedor','text',{required:true,readOnly:!!selected}),
+  f('name','Nome comercial','text',{required:true}),
+  f('categories','Categorias (separadas por vírgulas)','text',{placeholder:'Combustível, Peças'})
+ ];
+ if(screen==='documents'&&action==='save')return [
+  f('id','Código do documento','text',{required:true,readOnly:!!selected}),
+  vehicle,f('type','Tipo','text',{required:true,placeholder:'Licenciamento'}),
+  f('number','Número','text',{required:true}),
+  f('expiresAt','Validade','date',{required:true})
+ ];
+ if(screen==='tires'&&action==='save')return [
+  f('id','Código do pneu','text',{required:true,readOnly:!!selected}),
+  f('serialNumber','Número de série','text',{required:true})
+ ];
+ if(screen==='tires'&&action==='install')return [
+  vehicle,f('position','Posição','text',{required:true,placeholder:'DD, DE...'}),
+  num('odometer','KM da instalação',{required:true})
+ ];
+ if(screen==='tires'&&action==='remove')return [
+  num('odometer','KM da retirada',{required:true}),
+  choice('reason','Motivo',[{value:'rotation',label:'Rodízio'},{value:'wear',label:'Desgaste'},{value:'damage',label:'Avaria'}],{required:true})
+ ];
+ if(screen==='fuelings'&&action==='create')return [
+  vehicle,
+  choice('supplierPartyId','Fornecedor (opcional)',[{value:'',label:'Sem fornecedor'},...suppliers.map(v=>({value:v.partyId,label:v.name||v.partyId}))]),
+  num('liters','Litros',{required:true,min:0.001}),
+  money('unitPriceMinor','Preço por litro (R$)',{required:true,min:0.01}),
+  num('odometer','KM no abastecimento',{required:true}),
+  f('occurredAt','Data do abastecimento','date',{required:true})
+ ];
  if(screen==='settings'&&action==='restore')return [choice('id','Cópia que será restaurada',backups.map(b=>({value:b.id,label:b.id+' · '+new Date(b.createdAt).toLocaleString('pt-BR')})),{required:true})];
  return [];
 }
