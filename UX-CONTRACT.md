@@ -23,6 +23,13 @@
 - Navegação mobile: abre menu e fecha após escolher destino; Escape fecha modal de edição sujeito à proteção de descarte.
 - Focus: o título de tela recebe foco programático após navegação; controles de ação mostram `focus-visible`.
 
+## Fretes canônicos
+- Motoristas são exclusivamente `fleet.drivers`, associados ao mesmo `fleet.vehicles` já utilizado pela manutenção.
+- Contratos, rotas e viagens: `freight.contracts`, `freight.routes`, `freight.orders` no banco `fleet-maintenance`.
+- Despesas da viagem: somente `fleet-maintenance.finance`, identificadas por `allocation.kind=freight`, sem duplicação em outra collection.
+- Preço contratual menos despesas gera **resultado operacional estimado**, não caixa recebido.
+- Eventos de acompanhamento não podem alterar diretamente o estado de conclusão; motorista e veículo são validados no despacho e versão concorrente impede sobrescrita.
+
 ## Revisão de aceitação
 1. `npm run check` (contratos + dados + compilação React).
 2. `npm run qa:surface` (11 telas / 21 ações).
