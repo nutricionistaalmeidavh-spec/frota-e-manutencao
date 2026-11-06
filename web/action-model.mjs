@@ -5,11 +5,13 @@ export const ACTION_LABELS = Object.freeze({
   authorize:'Autorizar OS',start:'Iniciar OS',complete:'Concluir OS',cancel:'Cancelar OS',
   receive:'Entrada de estoque',consume:'Saída de estoque',reserve:'Reservar peças',
   release:'Liberar reserva',addExpense:'Registrar despesa',csv:'Exportar CSV',
-  issue:'Registrar emissão',backup:'Criar cópia local',restore:'Restaurar cópia'
+  issue:'Registrar emissão',backup:'Criar cópia local',restore:'Restaurar cópia',
+  dispatch:'Iniciar viagem',event:'Atualizar andamento',incident:'Registrar ocorrência',tripExpense:'Despesa da viagem'
 });
 export const REPORT_TYPES = [
   {value:'vehicle-cost',label:'Custos por veículo'},
-  {value:'vehicle-documents',label:'Documentos da frota'}
+  {value:'vehicle-documents',label:'Documentos da frota'},
+  {value:'freight-margin',label:'Resultado por viagem/frete'}
 ];
 const f=(key,label,type='text',extra={})=>({key,label,type,...extra});
 const choice=(key,label,options,extra={})=>f(key,label,'select',{options,...extra});
@@ -19,7 +21,7 @@ const num=(key,label,extra={})=>f(key,label,'number',{min:0,...extra});
 const triggerTypes=[
  {value:'odometer',label:'Quilometragem (km)'},{value:'hourmeter',label:'Horímetro (h)'},{value:'calendar-days',label:'Dias corridos'}
 ];
-export function getActionFields(screen,action,{selected=null,vehicles=[],backups=[]}={}){
+export function getActionFields(screen,action,{selected=null,vehicles=[],drivers=[],routes=[],contracts=[],backups=[]}={}){
  const vehicle=assetChoice(vehicles);
  if(screen==='fleet'&&action==='save')return [
   f('assetId','Código interno','text',{required:true,readOnly:!!selected,placeholder:'Ex.: CAM-001'}),
