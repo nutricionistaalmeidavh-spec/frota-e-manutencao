@@ -187,14 +187,15 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
   setPath(payload,field.key,value);
  }
  const existing=selected?.payload??selected??null;
- if(action==='save'&&existing&&['fleet','preventive-plans','checklists','drivers','freight-routes','freight-contracts'].includes(screen)){
+ if(action==='save'&&existing&&['fleet','preventive-plans','checklists','drivers','freight-routes','freight-contracts','tires','documents','suppliers'].includes(screen)){
   if(screen==='fleet')payload.assetId=existing.assetId;
   else if(screen==='drivers')payload.partyId=existing.partyId;
   else if(screen==='preventive-plans')payload.id=existing.id;
   else payload.id=existing.id;
  }
- if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||(screen==='freights'&&action==='create')||
+ if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||(screen==='freights'&&action==='create')||(screen==='fuelings'&&action==='create')||
     (screen==='finance'&&action==='addExpense')||(screen==='checklists'&&action==='save'&&!existing))payload.id=uuid();
+ if(screen==='suppliers'&&action==='save')payload.categories=String(draft.categories??'').split(',').map(x=>x.trim()).filter(Boolean);
  if(screen==='freights'&&action==='tripExpense')payload.expenseId=uuid();
  if(screen==='freights'&&action==='incident')payload.incidentId=uuid();
  if(screen==='work-orders'&&action==='addItem'){
@@ -205,7 +206,8 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
  if(screen==='readings'&&action==='save')payload.assetId=existing?.assetId;
  if(screen==='work-orders'&&action!=='create')payload.id=existing?.id;
  if(screen==='freights'&&action!=='create')payload.id=existing?.id;
- if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel','dispatch','event','incident','tripExpense'].includes(action))
+ if(screen==='tires'&&['install','remove'].includes(action))payload.id=existing?.id;
+ if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel','dispatch','event','incident','tripExpense','install'].includes(action))
   payload.expectedVersion=selected.version;
  if(screen==='work-orders'&&action==='complete'&&!raw('meterReading'))delete payload.meterReading;
  if(screen==='fleet'&&action==='remove')return {id:existing.assetId,expectedVersion:selected.version};
@@ -223,6 +225,9 @@ export function allowedActions(screen,selected=null,{backups=[]}={}){
     ...(s==='draft'?['authorize']:[]),...(s==='authorized'?['start']:[]),
     ...(s==='in-progress'?['complete']:[]),...(!['completed','cancelled'].includes(s)?['cancel']:[])];
  }
+ if(screen==='tires')return !p?['save']:['save',...(p.status==='installed'?['remove']:['install'])];
+ if(screen==='fuelings')return ['create'];
+ if(['documents','suppliers'].includes(screen))return ['save'];
  if(screen==='freights')return !p?['create']:['create',...(p.status==='planned'?['dispatch','cancel']:[]),...(p.status==='in-transit'?['event','incident','tripExpense','complete','cancel']:[]),...(p.status==='completed'?['incident','tripExpense']:[])];
  if(['drivers','freight-routes','freight-contracts'].includes(screen))return ['save'];
  if(screen==='inventory')return ['receive','consume','reserve','release'];
