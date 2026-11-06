@@ -32,7 +32,14 @@
 
 ## Revisão de aceitação
 1. `npm run check` (contratos + dados + compilação React).
-2. `npm run qa:surface` (11 telas / 21 ações).
+2. `npm run qa:surface` (19 telas / 37 ações).
 3. `npm run qa:web` (registro, leitura, backup após reload, mobile, screenshots).
 4. `npm run build:win` antes de entregar um instalador.
 5. Homologação com banco legado permanece separada e condicionada ao arquivo real de origem. QA de UI não substitui certificação de migração.
+
+## Novos fluxos de frota
+
+- UI de abastecimento registra fato em `fleet.fuelings`; custo derivado aparece em Financeiro e relatório sem criar despesas em duplicidade.
+- UI de OS preventiva exige seleção de plano para reiniciar o ciclo de vencimento na conclusão.
+- Peças de OS exigem SKU, e a conclusão valida saldo derivado de movimentos manuais e OS concluídas.
+- O sistema não anuncia baixas de estoque como movimentos manuais; cada saída derivada aponta para a OS responsável.
