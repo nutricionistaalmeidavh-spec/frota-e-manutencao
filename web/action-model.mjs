@@ -5,11 +5,16 @@ export const ACTION_LABELS = Object.freeze({
   authorize:'Autorizar OS',start:'Iniciar OS',complete:'Concluir OS',cancel:'Cancelar OS',
   receive:'Entrada de estoque',consume:'Saída de estoque',reserve:'Reservar peças',
   release:'Liberar reserva',addExpense:'Registrar despesa',csv:'Exportar CSV',
-  issue:'Registrar emissão',backup:'Criar cópia local',restore:'Restaurar cópia'
+  issue:'Registrar emissão',backup:'Criar cópia local',restore:'Restaurar cópia',
+  dispatch:'Iniciar viagem',event:'Atualizar andamento',incident:'Registrar ocorrência',tripExpense:'Despesa da viagem',install:'Instalar pneu',removeTire:'Retirar pneu'
 });
 export const REPORT_TYPES = [
   {value:'vehicle-cost',label:'Custos por veículo'},
-  {value:'vehicle-documents',label:'Documentos da frota'}
+  {value:'vehicle-documents',label:'Documentos da frota'},
+  {value:'freight-margin',label:'Resultado por viagem/frete'},
+  {value:'maintenance-history',label:'Histórico de manutenção'},
+  {value:'fuel-consumption',label:'Abastecimentos e consumo'},
+  {value:'operating-cost',label:'Custos operacionais por veículo'}
 ];
 const f=(key,label,type='text',extra={})=>({key,label,type,...extra});
 const choice=(key,label,options,extra={})=>f(key,label,'select',{options,...extra});
@@ -19,7 +24,7 @@ const num=(key,label,extra={})=>f(key,label,'number',{min:0,...extra});
 const triggerTypes=[
  {value:'odometer',label:'Quilometragem (km)'},{value:'hourmeter',label:'Horímetro (h)'},{value:'calendar-days',label:'Dias corridos'}
 ];
-export function getActionFields(screen,action,{selected=null,vehicles=[],backups=[]}={}){
+export function getActionFields(screen,action,{selected=null,vehicles=[],drivers=[],routes=[],contracts=[],plans=[],suppliers=[],backups=[]}={}){
  const vehicle=assetChoice(vehicles);
  if(screen==='fleet'&&action==='save')return [
   f('assetId','Código interno','text',{required:true,readOnly:!!selected,placeholder:'Ex.: CAM-001'}),
@@ -37,17 +42,19 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],backups
   vehicle,choice('type','Tipo',[{value:'preventive',label:'Preventiva'},{value:'corrective',label:'Corretiva'}]),
   f('title','Título da OS','text',{required:true,placeholder:'Ex.: Revisão dos freios'}),
   choice('priority','Prioridade',[{value:'normal',label:'Normal'},{value:'high',label:'Alta'},{value:'urgent',label:'Urgente'}]),
-  f('reportedIssue','Descrição do serviço','textarea',{required:false})
+  f('reportedIssue','Descrição do serviço','textarea',{required:false}),
+  choice('sourceRef','Plano preventivo (para OS preventiva)',[{value:'',label:'Não vincular (OS corretiva)'},...plans.map(p=>({value:p.id,label:p.name+' · '+p.assetId}))])
  ];
  if(screen==='work-orders'&&action==='addItem')return [
   choice('item.type','Tipo de item',[{value:'part',label:'Peça'},{value:'service',label:'Serviço'}]),
+  f('item.sku','Código da peça (SKU) — para peças','text'),
   f('item.description','Descrição','text',{required:true}),num('item.quantity','Quantidade',{required:true,min:0.001}),
   money('item.unitCostMinor','Custo unitário (R$)')
  ];
  if(screen==='work-orders'&&action==='authorize')return [f('authorizedByPartyId','Responsável pela autorização','text',{required:true})];
  if(screen==='work-orders'&&action==='start')return [f('technicianPartyId','Técnico responsável','text',{required:true})];
  if(screen==='work-orders'&&action==='complete')return [f('notes','Observações da conclusão','textarea'),num('meterReading','Leitura final (opcional)')];
- if(screen==='work-orders'&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
+ if(['work-orders','freights'].includes(screen)&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
  if(screen==='inventory'&&['receive','consume','reserve','release'].includes(action))return [
   f('sku','Código da peça (SKU)','text',{required:true}),num('quantity','Quantidade',{required:true,min:0.001})
  ];
@@ -62,6 +69,87 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],backups
   f('description','Descrição','text',{required:true}),f('dueDate','Vencimento (opcional)','date')
  ];
  if(screen==='reports'&&['csv','issue'].includes(action))return [choice('type','Relatório',REPORT_TYPES)];
+ if(screen==='drivers'&&action==='save')return [
+  f('partyId','Código do motorista','text',{required:true,readOnly:!!selected}),
+  f('licenseNumber','Número da CNH','text',{required:true}),
+  choice('licenseCategory','Categoria',[{value:'A',label:'A'},{value:'B',label:'B'},{value:'C',label:'C'},{value:'D',label:'D'},{value:'E',label:'E'}],{required:true}),
+  f('licenseExpiresAt','Validade da CNH','date',{required:true}),
+  choice('status','Situação',[{value:'active',label:'Ativo'},{value:'inactive',label:'Inativo'}])
+ ];
+ if(screen==='freight-routes'&&action==='save')return [
+  f('id','Código da rota','text',{required:true,readOnly:!!selected}),
+  f('origin','Origem','text',{required:true}),f('destination','Destino','text',{required:true}),
+  num('distanceKm','Distância (km)',{required:true}),money('tollEstimateMinor','Pedágio estimado (R$)')
+ ];
+ if(screen==='freight-contracts'&&action==='save')return [
+  f('id','Código do contrato','text',{required:true,readOnly:!!selected}),
+  f('customerPartyId','Código do cliente','text',{required:true}),
+  choice('rateType','Tipo de tarifa',[{value:'fixed',label:'Valor fixo'},{value:'per-km',label:'Por km'},{value:'per-ton',label:'Por tonelada'}],{required:true}),
+  money('rateMinor','Valor da tarifa (R$)',{required:true,min:0.01})
+ ];
+ if(screen==='freights'&&action==='create')return [
+  f('customerPartyId','Código do cliente','text',{required:true}),
+  f('origin','Origem','text',{required:true}),f('destination','Destino','text',{required:true}),
+  f('cargoDescription','Descrição da carga','textarea',{required:true}),
+  choice('routeId','Rota cadastrada (opcional)',[{value:'',label:'Sem rota'},...routes.map(x=>({value:x.id,label:x.origin+' → '+x.destination}))]),
+  choice('contractId','Contrato (opcional)',[{value:'',label:'Sem contrato'},...contracts.map(x=>({value:x.id,label:x.id+' · '+x.customerPartyId}))]),
+  num('weightKg','Peso (kg) para tarifa por tonelada'),
+  money('priceMinor','Valor do frete (R$) — opcional se houver contrato')
+ ];
+ if(screen==='freights'&&action==='dispatch')return [
+  choice('vehicleAssetId','Veículo da frota',vehicles.map(v=>({value:v.assetId,label:(v.plate||v.assetId)+' · '+v.assetId})),{required:true}),
+  choice('driverPartyId','Motorista cadastrado',drivers.filter(x=>x.status!=='inactive').map(v=>({value:v.partyId,label:v.partyId+' · CNH '+v.licenseNumber})),{required:true}),
+  num('odometerStart','Quilometragem de saída',{required:true})
+ ];
+ if(screen==='freights'&&action==='event')return [
+  choice('status','Etapa da viagem',[{value:'loading',label:'Carregamento'},{value:'in-transit',label:'Em trânsito'},{value:'delivered',label:'Entregue'}],{required:true}),
+  f('location','Local (opcional)','text'),f('notes','Observações','textarea')
+ ];
+ if(screen==='freights'&&action==='incident')return [
+  f('type','Tipo de ocorrência','text',{required:true}),f('description','Descrição','textarea',{required:true}),
+  money('costMinor','Custo estimado (R$)')
+ ];
+ if(screen==='freights'&&action==='tripExpense')return [
+  choice('category','Categoria',[{value:'fuel',label:'Combustível'},{value:'toll',label:'Pedágio'},{value:'food',label:'Alimentação'},{value:'maintenance',label:'Manutenção'},{value:'other',label:'Outros'}],{required:true}),
+  f('description','Descrição da despesa','text',{required:true}),
+  money('amountMinor','Valor (R$)',{required:true,min:0.01})
+ ];
+ if(screen==='freights'&&action==='complete')return [
+  num('odometerEnd','Quilometragem de chegada',{required:true}),
+  f('proofDocumentRef','Referência do comprovante de entrega','text')
+ ];
+ if(screen==='freights'&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
+ if(screen==='suppliers'&&action==='save')return [
+  f('partyId','Código do fornecedor','text',{required:true,readOnly:!!selected}),
+  f('name','Nome comercial','text',{required:true}),
+  f('categories','Categorias (separadas por vírgulas)','text',{placeholder:'Combustível, Peças'})
+ ];
+ if(screen==='documents'&&action==='save')return [
+  f('id','Código do documento','text',{required:true,readOnly:!!selected}),
+  vehicle,f('type','Tipo','text',{required:true,placeholder:'Licenciamento'}),
+  f('number','Número','text',{required:true}),
+  f('expiresAt','Validade','date',{required:true})
+ ];
+ if(screen==='tires'&&action==='save')return [
+  f('id','Código do pneu','text',{required:true,readOnly:!!selected}),
+  f('serialNumber','Número de série','text',{required:true})
+ ];
+ if(screen==='tires'&&action==='install')return [
+  vehicle,f('position','Posição','text',{required:true,placeholder:'DD, DE...'}),
+  num('odometer','KM da instalação',{required:true})
+ ];
+ if(screen==='tires'&&action==='remove')return [
+  num('odometer','KM da retirada',{required:true}),
+  choice('reason','Motivo',[{value:'rotation',label:'Rodízio'},{value:'wear',label:'Desgaste'},{value:'damage',label:'Avaria'}],{required:true})
+ ];
+ if(screen==='fuelings'&&action==='create')return [
+  vehicle,
+  choice('supplierPartyId','Fornecedor (opcional)',[{value:'',label:'Sem fornecedor'},...suppliers.map(v=>({value:v.partyId,label:v.name||v.partyId}))]),
+  num('liters','Litros',{required:true,min:0.001}),
+  money('unitPriceMinor','Preço por litro (R$)',{required:true,min:0.01}),
+  num('odometer','KM no abastecimento',{required:true}),
+  f('occurredAt','Data do abastecimento','date',{required:true})
+ ];
  if(screen==='settings'&&action==='restore')return [choice('id','Cópia que será restaurada',backups.map(b=>({value:b.id,label:b.id+' · '+new Date(b.createdAt).toLocaleString('pt-BR')})),{required:true})];
  return [];
 }
@@ -99,13 +187,17 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
   setPath(payload,field.key,value);
  }
  const existing=selected?.payload??selected??null;
- if(action==='save'&&existing&&['fleet','preventive-plans','checklists'].includes(screen)){
+ if(action==='save'&&existing&&['fleet','preventive-plans','checklists','drivers','freight-routes','freight-contracts','tires','documents','suppliers'].includes(screen)){
   if(screen==='fleet')payload.assetId=existing.assetId;
+  else if(screen==='drivers')payload.partyId=existing.partyId;
   else if(screen==='preventive-plans')payload.id=existing.id;
   else payload.id=existing.id;
  }
- if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||
+ if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||(screen==='freights'&&action==='create')||(screen==='fuelings'&&action==='create')||
     (screen==='finance'&&action==='addExpense')||(screen==='checklists'&&action==='save'&&!existing))payload.id=uuid();
+ if(screen==='suppliers'&&action==='save')payload.categories=String(draft.categories??'').split(',').map(x=>x.trim()).filter(Boolean);
+ if(screen==='freights'&&action==='tripExpense')payload.expenseId=uuid();
+ if(screen==='freights'&&action==='incident')payload.incidentId=uuid();
  if(screen==='work-orders'&&action==='addItem'){
   payload.item.id=uuid();
  }
@@ -113,7 +205,9 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
     (screen==='readings'&&action==='save'))payload.id=existing?.id??existing?.assetId;
  if(screen==='readings'&&action==='save')payload.assetId=existing?.assetId;
  if(screen==='work-orders'&&action!=='create')payload.id=existing?.id;
- if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel'].includes(action))
+ if(screen==='freights'&&action!=='create')payload.id=existing?.id;
+ if(screen==='tires'&&['install','remove'].includes(action))payload.id=existing?.id;
+ if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel','dispatch','event','incident','tripExpense','install'].includes(action))
   payload.expectedVersion=selected.version;
  if(screen==='work-orders'&&action==='complete'&&!raw('meterReading'))delete payload.meterReading;
  if(screen==='fleet'&&action==='remove')return {id:existing.assetId,expectedVersion:selected.version};
@@ -131,6 +225,11 @@ export function allowedActions(screen,selected=null,{backups=[]}={}){
     ...(s==='draft'?['authorize']:[]),...(s==='authorized'?['start']:[]),
     ...(s==='in-progress'?['complete']:[]),...(!['completed','cancelled'].includes(s)?['cancel']:[])];
  }
+ if(screen==='tires')return !p?['save']:['save',...(p.status==='installed'?['remove']:['install'])];
+ if(screen==='fuelings')return ['create'];
+ if(['documents','suppliers'].includes(screen))return ['save'];
+ if(screen==='freights')return !p?['create']:['create',...(p.status==='planned'?['dispatch','cancel']:[]),...(p.status==='in-transit'?['event','incident','tripExpense','complete','cancel']:[]),...(p.status==='completed'?['incident','tripExpense']:[])];
+ if(['drivers','freight-routes','freight-contracts'].includes(screen))return ['save'];
  if(screen==='inventory')return ['receive','consume','reserve','release'];
  if(screen==='checklists')return ['save'];
  if(screen==='finance')return ['addExpense'];
@@ -138,4 +237,4 @@ export function allowedActions(screen,selected=null,{backups=[]}={}){
  if(screen==='settings')return backups.length?['backup','restore']:['backup'];
  return [];
 }
-export const isDestructive=(screen,action)=>action==='remove'||action==='restore'||(screen==='work-orders'&&action==='cancel');
+export const isDestructive=(screen,action)=>action==='remove'||action==='restore'||(['work-orders','freights'].includes(screen)&&action==='cancel');

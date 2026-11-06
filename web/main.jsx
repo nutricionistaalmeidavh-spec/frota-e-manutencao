@@ -34,6 +34,14 @@ const screenHelp={
  overview:'Acompanhe os principais números, pendências e custos da operação.',
  fleet:'Consulte, cadastre e atualize os veículos e máquinas da frota.',
  readings:'Registre quilometragem e horímetro sem perder o histórico de versão do veículo.',
+ fuelings:'Registre cada abastecimento, custo e quilometragem da frota.',
+ tires:'Acompanhe a instalação, retirada e vida útil dos pneus.',
+ documents:'Controle documentos dos veículos e suas datas de validade.',
+ suppliers:'Cadastre fornecedores da operação, oficinas e postos.',
+ freights:'Planeje, despache e conclua fretes com despesas e resultado por viagem.',
+ drivers:'Cadastre motoristas vinculados à mesma base da frota.',
+ 'freight-routes':'Cadastre trechos e distâncias para precificar os fretes.',
+ 'freight-contracts':'Defina tarifas fixas, por km ou tonelada para clientes.',
  'preventive-plans':'Defina intervalos de manutenção por veículo e acompanhe os vencimentos.',
  'work-orders':'Acompanhe cada OS da abertura até a conclusão, com etapas e responsáveis.',
  schedule:'Ordens abertas organizadas para orientar o planejamento.',
@@ -46,12 +54,20 @@ const screenHelp={
 const columns={
  fleet:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas']],
  readings:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas'],['lastReadingAt','Última leitura']],
+ fuelings:[['id','Abastecimento'],['assetId','Veículo'],['liters','Litros'],['unitPriceMinor','R$/L'],['totalMinor','Total'],['odometer','KM'],['occurredAt','Data']],
+ tires:[['id','Pneu'],['serialNumber','Série'],['assetId','Veículo'],['position','Posição'],['status','Situação']],
+ documents:[['id','Documento'],['assetId','Veículo'],['type','Tipo'],['number','Número'],['expiresAt','Validade']],
+ suppliers:[['partyId','Fornecedor'],['name','Nome'],['categories','Categorias']],
+ freights:[['id','Frete'],['origin','Origem'],['destination','Destino'],['vehicleAssetId','Veículo'],['status','Situação'],['priceMinor','Receita prevista'],['expenseMinor','Despesas'],['marginMinor','Resultado estimado']],
+ drivers:[['partyId','Motorista'],['licenseNumber','CNH'],['licenseCategory','Categoria'],['licenseExpiresAt','Validade'],['status','Situação']],
+ 'freight-routes':[['id','Rota'],['origin','Origem'],['destination','Destino'],['distanceKm','Distância (km)'],['tollEstimateMinor','Pedágio estimado']],
+ 'freight-contracts':[['id','Contrato'],['customerPartyId','Cliente'],['rateType','Tarifa'],['rateMinor','Valor']],
  'preventive-plans':[['name','Plano'],['assetId','Veículo'],['trigger.metric','Critério'],['due.due','Situação']],
  'work-orders':[['id','OS'],['title','Descrição'],['assetId','Veículo'],['status','Situação'],['totalCostMinor','Valor']],
  schedule:[['id','OS'],['title','Descrição'],['assetId','Veículo'],['status','Situação'],['openedAt','Aberta em']],
  inventory:[['sku','Código da peça'],['onHand','Disponível + reservado'],['reserved','Reservado']],
  checklists:[['title','Inspeção'],['assetId','Veículo'],['status','Situação'],['notes','Observações']],
- finance:[['description','Despesa'],['allocation.id','Veículo'],['amountMinor','Valor'],['dueDate','Vencimento']],
+ finance:[['description','Lançamento'],['allocation.kind','Origem'],['allocation.id','Referência'],['amountMinor','Valor'],['dueDate','Vencimento']],
  reports:[['type','Relatório emitido'],['issuedAt','Emissão'],['size','Tamanho']],
  settings:[['id','Cópia local'],['createdAt','Criada em']]
 };
@@ -59,18 +75,22 @@ const columnValue=(row,key)=>key.split('.').reduce((o,k)=>o?.[k],key.startsWith(
 function formatValue(value,key){
  if(key==='due.due')return value?'Vencida':'Em dia';
  if(key.includes('Minor'))return brl(value);
- if(key==='createdAt'||key==='issuedAt'||key==='dueDate'||key==='openedAt'||key==='lastReadingAt')return shortDate(value);
+ if(['createdAt','issuedAt','dueDate','openedAt','lastReadingAt','licenseExpiresAt','departedAt','completedAt','occurredAt','expiresAt'].includes(key))return shortDate(value);
  if(key==='trigger.metric')return({odometer:'Quilometragem',hourmeter:'Horímetro','calendar-days':'Dias corridos'})[value]??value;
- if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção'})[value]??value;
+ if(key==='allocation.kind')return({freight:'Frete',vehicle:'Veículo'})[value]??value;
+ if(key==='rateType')return({'fixed':'Fixo','per-km':'Por km','per-ton':'Por tonelada'})[value]??value;
+ if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção',planned:'Planejado','in-transit':'Em viagem',inactive:'Inativo',active:'Ativo',installed:'Instalado',stock:'No estoque',removed:'Retirado'})[value]??value;
  if(typeof value==='boolean')return value?'Sim':'Não';
  if(typeof value==='number')return numeric(value);
  if(value==null||value==='')return '—';
+ if(Array.isArray(value))return value.join(', ');
  if(typeof value==='object')return 'Ver detalhes';
  return String(value);
 }
 const navSections=[
- {name:'CONTROLE DA FROTA',items:['overview','fleet','readings']},
+ {name:'CONTROLE DA FROTA',items:['overview','fleet','readings','fuelings','tires','documents','suppliers']},
  {name:'MANUTENÇÃO',items:['preventive-plans','work-orders','schedule','inventory','checklists']},
+ {name:'TRANSPORTES E FRETES',items:['freights','drivers','freight-routes','freight-contracts']},
  {name:'GESTÃO',items:['finance','reports','settings']}
 ];
 function actionTitle(screen,action,selected){
@@ -79,6 +99,15 @@ function actionTitle(screen,action,selected){
  if(screen==='preventive-plans'&&action==='create')return 'Novo plano preventivo';
  if(screen==='preventive-plans'&&action==='save')return 'Editar plano preventivo';
  if(screen==='work-orders'&&action==='create')return 'Nova ordem de serviço';
+ if(screen==='freights'&&action==='create')return 'Novo frete';
+ if(screen==='fuelings'&&action==='create')return 'Novo abastecimento';
+ if(screen==='suppliers'&&action==='save')return selected?'Editar fornecedor':'Novo fornecedor';
+ if(screen==='documents'&&action==='save')return selected?'Editar documento':'Novo documento';
+ if(screen==='tires'&&action==='save')return selected?'Editar pneu':'Novo pneu';
+ if(screen==='tires'&&action==='remove')return 'Retirar pneu';
+ if(screen==='drivers'&&action==='save')return selected?'Editar motorista':'Novo motorista';
+ if(screen==='freight-routes'&&action==='save')return selected?'Editar rota':'Nova rota';
+ if(screen==='freight-contracts'&&action==='save')return selected?'Editar contrato':'Novo contrato';
  if(screen==='checklists'&&action==='save')return selected?'Editar inspeção':'Nova inspeção';
  return ACTION_LABELS[action]??action;
 }
@@ -87,6 +116,9 @@ function actionSubmitLabel(screen,action,selected){
  if(screen==='readings'&&action==='save')return 'Registrar leitura';
  if(screen==='preventive-plans'&&action==='create')return 'Criar plano';
  if(screen==='work-orders'&&action==='create')return 'Criar ordem de serviço';
+ if(screen==='freights'&&action==='create')return 'Criar frete';
+ if(screen==='fuelings'&&action==='create')return 'Registrar abastecimento';
+ if(screen==='tires'&&action==='remove')return 'Retirar pneu';
  return 'Confirmar '+(ACTION_LABELS[action]??action).toLocaleLowerCase('pt-BR');
 }
 const metrics=[
@@ -96,14 +128,19 @@ const metrics=[
  ['openWorkOrders','Ordens em aberto',''],
  ['expiredDocuments','Documentos vencidos','warning'],
  ['fuelCostMinor','Custo combustível','money'],
- ['expenseMinor','Despesas registradas','money']
+ ['expenseMinor','Despesas registradas','money'],
+ ['expiringDocuments','Documentos a vencer','warning'],
+ ['installedTires','Pneus instalados',''],
+ ['fuelLiters','Litros abastecidos',''],
+ ['plannedFreights','Fretes planejados',''],
+ ['inTransitFreights','Fretes em viagem','']
 ];
 function App(){
  const [backend,setBackend]=useState(null),[hasUsers,setHasUsers]=useState(null);
  const [needsPairing,setNeedsPairing]=useState(false),[pairCode,setPairCode]=useState('');
  const [credentials,setCredentials]=useState({username:'admin',password:''});
  const [auth,setAuth]=useState(null),[meta,setMeta]=useState(null),[screen,setScreen]=useState('overview');
- const [data,setData]=useState(null),[vehicles,setVehicles]=useState([]),[busy,setBusy]=useState(false);
+ const [data,setData]=useState(null),[vehicles,setVehicles]=useState([]),[drivers,setDrivers]=useState([]),[routes,setRoutes]=useState([]),[contracts,setContracts]=useState([]),[plans,setPlans]=useState([]),[suppliers,setSuppliers]=useState([]),[busy,setBusy]=useState(false);
  const [message,setMessage]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const [chosen,setChosen]=useState(null),[panel,setPanel]=useState(null),[draft,setDraft]=useState({});
  const [search,setSearch]=useState(''),[mobileNav,setMobileNav]=useState(false),[refresh,setRefresh]=useState(0);
@@ -116,12 +153,18 @@ function App(){
    return()=>{active=false};
  },[backend,auth,meta,screen,refresh]);
  useEffect(()=>{let active=true;if(!backend||!auth)return;backend.load({screenId:'fleet',auth}).then(d=>{if(active)setVehicles((d.rows??[]).map(unwrap))}).catch(()=>{});return()=>{active=false}},[backend,auth,refresh]);
+ useEffect(()=>{let active=true;if(!backend||!auth)return;
+  for(const [id,setter] of [['drivers',setDrivers],['freight-routes',setRoutes],['freight-contracts',setContracts],['preventive-plans',setPlans],['suppliers',setSuppliers]]){
+   backend.load({screenId:id,auth}).then(d=>{if(active)setter((d.rows??[]).map(unwrap))}).catch(()=>{});
+  }
+  return()=>{active=false};
+ },[backend,auth,refresh]);
  const allRows=useMemo(()=>getRows(screen,data),[screen,data]);
  const filtered=useMemo(()=>allRows.filter(r=>!search||JSON.stringify(unwrap(r)).toLocaleLowerCase('pt-BR').includes(search.toLocaleLowerCase('pt-BR'))),[allRows,search]);
  const selected=allRows.find(r=>recordId(r)===chosen)??null;
  const title=meta?.screens?.find(s=>s.id===screen)?.title??meta?.navigation?.find(n=>n.id===screen)?.label??'Visão Geral';
  const actions=allowedActions(screen,selected,{backups:data?.backups??[]});
- const actionFields=panel?getActionFields(screen,panel,{selected,vehicles,backups:data?.backups??[]}):[];
+ const actionFields=panel?getActionFields(screen,panel,{selected,vehicles,drivers,routes,contracts,plans,suppliers,backups:data?.backups??[]}):[];
  const sections=navSections.map(section=>({...section,items:section.items.filter(id=>meta?.navigation?.some(n=>n.id===id))}));
  const navigate=id=>{setScreen(id);setChosen(null);setPanel(null);setMessage(null);setError('');setSearch('');setMobileNav(false);requestAnimationFrame(()=>mainHeading.current?.focus())};
  async function submitPair(e){e.preventDefault();if(!backend||busy)return;setBusy(true);setError('');try{await backend.pair(pairCode);const s=await backend.authState();setHasUsers(s.hasUsers);setNeedsPairing(false);setPairCode('')}catch(e){setError(e.message)}finally{setBusy(false)}}
@@ -131,7 +174,7 @@ function App(){
   }catch(e){if(backend.paired&&!backend.paired())setNeedsPairing(true);setError(e.message)}finally{setBusy(false)}
  }
  async function logout(){if(!backend||!auth)return;try{await backend.logout(auth)}catch{}setAuth(null);setMeta(null);setData(null);setChosen(null);setPanel(null);setError('');setCredentials(c=>({...c,password:''}))}
- const openAction=action=>{const prepared=defaultDraft(getActionFields(screen,action,{selected,vehicles,backups:data?.backups??[]}),selected);initialDraft.current={...prepared};setPanel(action);setMessage(null);setError('');setDraft(prepared)};
+ const openAction=action=>{const prepared=defaultDraft(getActionFields(screen,action,{selected,vehicles,drivers,routes,contracts,plans,suppliers,backups:data?.backups??[]}),selected);initialDraft.current={...prepared};setPanel(action);setMessage(null);setError('');setDraft(prepared)};
  const closePanel=()=>{if(busy)return;const changed=Object.keys(draft).some(key=>draft[key]!==initialDraft.current[key]);if(changed&&!window.confirm('Descartar as alterações ainda não salvas?'))return;setPanel(null);setError('')};
  useEffect(()=>{if(!panel)return;const onKey=e=>{if(e.key==='Escape'&&!busy){e.preventDefault();closePanel()}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey)},[panel,busy,draft]);
  async function submitAction(event){event.preventDefault();if(busy||!panel)return;
@@ -177,19 +220,39 @@ function App(){
       {error&&!panel&&<div className="notice notice-error" role="alert">{error}<button type="button" aria-label="Fechar erro" onClick={()=>setError('')}>×</button></div>}
       {loading||data===null?<div className="loading-surface" role="status">Carregando informações…</div>:<>
        {screen==='overview'&&<div className="overview-body">
-       <section className="mission-board" aria-label="Situação da operação"><div className="mission-copy"><span className="mission-tag"><span className="pulse-dot"/>{Number(data?.cards?.maintenanceDue)>0?'MANUTENÇÃO EXIGE ATENÇÃO':Number(data?.cards?.openWorkOrders)>0?'SERVIÇOS EM ANDAMENTO':'PAINEL OPERACIONAL'}</span><h2>{Number(data?.cards?.maintenanceDue)>0?'Há manutenções a acompanhar':Number(data?.cards?.vehicles)>0?'Sua operação em uma visão.':'Comece pelo primeiro veículo.'}</h2><p>{Number(data?.cards?.maintenanceDue)>0?'Consulte os planos vencidos e organize as ordens de serviço.':Number(data?.cards?.vehicles)>0?'Acompanhe veículos, planos de manutenção e despesas em um só lugar.':'Cadastre um veículo para começar a controlar leituras, manutenção e custos.'}</p></div><div className="mission-figure"><span>VEÍCULOS NA FROTA</span><strong>{numeric(data?.cards?.vehicles)}</strong><button type="button" onClick={()=>navigate('fleet')}>Abrir frota <Icon name="arrow" size={16}/></button></div></section>
+       <section className="mission-board" aria-label="Situação da operação"><div className="mission-copy"><span className="mission-tag"><span className="pulse-dot"/>{Number(data?.cards?.maintenanceDue)>0?'MANUTENÇÃO EXIGE ATENÇÃO':Number(data?.cards?.openWorkOrders)>0?'SERVIÇOS EM ANDAMENTO':'PAINEL OPERACIONAL'}</span><h2>{Number(data?.cards?.maintenanceDue)>0?'Há manutenções a acompanhar':Number(data?.cards?.vehicles)>0?'Sua operação em uma visão.':'Comece pelo primeiro veículo.'}</h2><p>{Number(data?.cards?.maintenanceDue)>0?'Consulte os planos vencidos e organize as ordens de serviço.':Number(data?.cards?.vehicles)>0?'Acompanhe veículos, planos de manutenção, fretes e despesas em um só lugar.':'Cadastre um veículo para começar a controlar leituras, manutenção e custos.'}</p></div><div className="mission-figure"><span>VEÍCULOS NA FROTA</span><strong>{numeric(data?.cards?.vehicles)}</strong><button type="button" onClick={()=>navigate('fleet')}>Abrir frota <Icon name="arrow" size={16}/></button></div></section>
        <div className="group-title"><div><span className="eyebrow">CONTROLE DIÁRIO</span><h2>Visão operacional</h2></div><span className="scope-label">Registros deste dispositivo</span></div>
        <div className="metric-grid primary-metrics">{metrics.slice(0,4).map(([key,label,kind],index)=><article className={'metric-card '+(kind==='warning'&&Number(data?.cards?.[key])>0?'metric-alert':'')} key={key}><div className="metric-top"><span>{label}</span><Icon name={['fleet','preventive-plans','alert','work-orders'][index]} size={18}/></div><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{numeric(data?.cards?.[key])}</strong><small>{kind==='warning'&&Number(data?.cards?.[key])>0?'Requer acompanhamento':'Dados da operação'}</small></article>)}</div>
-       <div className="group-title group-title-secondary"><div><span className="eyebrow">SAÚDE DA GESTÃO</span><h2>Documentos e custos</h2></div></div>
-       <div className="secondary-metrics">{metrics.slice(4).map(([key,label,kind],index)=><article className="secondary-metric" key={key}><span className="secondary-icon"><Icon name={index===0?'alert':'finance'} size={18}/></span><div><span>{label}</span><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{kind==='money'?brl(data?.cards?.[key]):numeric(data?.cards?.[key])}</strong></div></article>)}</div>
+       <div className="group-title group-title-secondary"><div><span className="eyebrow">SAÚDE DA GESTÃO</span><h2>Documentos, custos e viagens</h2></div></div>
+       <div className="secondary-metrics">{metrics.slice(4).map(([key,label,kind],index)=><article className="secondary-metric" key={key}><span className="secondary-icon"><Icon name={index===0?'alert':index>=3?'freights':'finance'} size={18}/></span><div><span>{label}</span><strong className={kind==='warning'&&Number(data?.cards?.[key])>0?'caution':''}>{kind==='money'?brl(data?.cards?.[key]):numeric(data?.cards?.[key])}</strong></div></article>)}</div>
        <section className="insight-panel"><div><span className="eyebrow">FLUXO DE TRABALHO</span><h2>{Number(data?.cards?.vehicles)>0?'Continue seu controle de frota':'Por onde começar?'}</h2><p>Do cadastro ao acompanhamento: cada registro alimenta os próximos passos do controle operacional.</p></div><div className="quick-actions"><button onClick={()=>navigate('fleet')}>Cadastrar ou consultar veículos <Icon name="arrow" size={17}/></button><button onClick={()=>navigate('preventive-plans')}>Acompanhar preventivas <Icon name="arrow" size={17}/></button><button onClick={()=>navigate('work-orders')}>Consultar ordens de serviço <Icon name="arrow" size={17}/></button></div></section>
        </div>}
-       {screen!=='overview'&&<section className="content-panel"><div className="section-header"><div><h2>{screen==='inventory'?'Posição atual de estoque':screen==='reports'?'Emissões registradas':screen==='settings'?'Cópias de segurança':'Registros'}</h2><p>{allRows.length} registro{allRows.length===1?'':'s'} {search?'· '+filtered.length+' encontrado(s)':''}</p></div><div className="panel-actions">{allRows.length>0&&<label className="search-label"><span className="sr-only">Buscar registros</span><Icon name="search" size={16}/><input type="search" placeholder="Pesquisar nesta lista…" value={search} onChange={e=>setSearch(e.target.value)}/></label>}{actions.filter(a=>!selected||['create','addExpense','backup','csv','issue','receive'].includes(a)).slice(0,2).map(a=><button className={a==='save'||a==='create'||a==='addExpense'?'primary':'secondary'} key={a} onClick={()=>openAction(a)} type="button">{a==='save'&&screen==='fleet'&&!selected?'Novo veículo':a==='create'&&screen==='work-orders'?'Nova ordem de serviço':a==='create'&&screen==='preventive-plans'?'Novo plano preventivo':ACTION_LABELS[a]??a}</button>)}</div></div>
+       {screen!=='overview'&&<section className="content-panel"><div className="section-header"><div><h2>{screen==='inventory'?'Posição atual de estoque':screen==='reports'?'Emissões registradas':screen==='settings'?'Cópias de segurança':'Registros'}</h2><p>{allRows.length} registro{allRows.length===1?'':'s'} {search?'· '+filtered.length+' encontrado(s)':''}</p></div><div className="panel-actions">{allRows.length>0&&<label className="search-label"><span className="sr-only">Buscar registros</span><Icon name="search" size={16}/><input type="search" placeholder="Pesquisar nesta lista…" value={search} onChange={e=>setSearch(e.target.value)}/></label>}{actions.filter(a=>!selected||['create','addExpense','backup','csv','issue','receive'].includes(a)).slice(0,2).map(a=><button className={a==='save'||a==='create'||a==='addExpense'?'primary':'secondary'} key={a} onClick={()=>openAction(a)} type="button">{a==='save'&&screen==='fleet'&&!selected?'Novo veículo':a==='create'&&screen==='work-orders'?'Nova ordem de serviço':a==='create'&&screen==='preventive-plans'?'Novo plano preventivo':a==='create'&&screen==='freights'?'Novo frete':a==='create'&&screen==='fuelings'?'Novo abastecimento':a==='save'&&screen==='suppliers'?'Novo fornecedor':a==='save'&&screen==='documents'?'Novo documento':a==='save'&&screen==='tires'?'Novo pneu':a==='save'&&screen==='drivers'?'Novo motorista':a==='save'&&screen==='freight-routes'?'Nova rota':a==='save'&&screen==='freight-contracts'?'Novo contrato':ACTION_LABELS[a]??a}</button>)}</div></div>
        {screen==='settings'&&<p className="help-banner">As cópias do navegador ficam no armazenamento local deste dispositivo. Para não perder dados ao limpar o navegador, mantenha uma cópia externa conforme sua política de backup.</p>}
        {!filtered.length?<div className="empty-view"><span className="empty-symbol"><Icon name={screen==='settings'?'shield':screen==='reports'?'reports':screen==='work-orders'?'work-orders':screen==='inventory'?'inventory':'fleet'} size={25}/></span><h3>{search?'Nenhum resultado para sua pesquisa':screen==='fleet'?'Sua frota começa aqui':screen==='readings'?'Nenhuma leitura para acompanhar':screen==='work-orders'?'Nenhuma ordem de serviço registrada':screen==='preventive-plans'?'Sem planos preventivos cadastrados':screen==='settings'?'Nenhuma cópia de segurança criada':'Ainda não há registros nesta área'}</h3><p>{search?'Tente outro termo ou limpe a busca para ver todos os registros.':screen==='readings'?'Cadastre primeiro um veículo em Frota e Máquinas. Em seguida, registre suas leituras.':screen==='fleet'?'Cadastre seu primeiro veículo para relacionar leituras, serviços e custos.':screen==='settings'?'Crie uma cópia para poder recuperar os dados salvos neste dispositivo.':'Use a ação acima para iniciar. Os registros salvos aparecerão aqui.'}</p>{search?<button className="secondary empty-action" type="button" onClick={()=>setSearch('')}>Limpar pesquisa</button>:screen==='readings'?<button className="secondary empty-action" type="button" onClick={()=>navigate('fleet')}>Ir para Frota e Máquinas <Icon name="arrow" size={16}/></button>:null}</div>:
-       <div className="table-scroll"><table><caption className="sr-only">{title} — {filtered.length} registros</caption><thead><tr>{(columns[screen]??[]).map(([key,label])=><th key={key}>{label}</th>)}<th>Detalhes</th></tr></thead><tbody>{filtered.map(row=><tr key={recordId(row)} className={chosen===recordId(row)?'selected-row':''}><React.Fragment>{(columns[screen]??[]).map(([key])=><td key={key}><span className={key==='status'||key==='due.due'?'status-pill '+((key==='due.due'&&columnValue(row,key))||(['cancelled','attention'].includes(columnValue(row,key)))?'status-danger':(['authorized','in-progress','pending'].includes(columnValue(row,key)))?'status-progress':(['completed','ok'].includes(columnValue(row,key)))?'status-good':''):''}>{formatValue(columnValue(row,key),key)}</span></td>)}</React.Fragment><td><button className="row-action" onClick={()=>{setChosen(chosen===recordId(row)?null:recordId(row));setPanel(null);setMessage(null)}} aria-label={'Ver detalhes de '+recordId(row)} type="button">{chosen===recordId(row)?'Ocultar':'Ver detalhes'} <Icon name="chevron" size={15}/></button></td></tr>)}</tbody></table></div>}
-       {selected&&<div className="record-detail"><div><p className="eyebrow">REGISTRO SELECIONADO</p><h3>{unwrap(selected)?.title??unwrap(selected)?.name??unwrap(selected)?.plate??recordId(selected)}</h3><p>Identificador: {recordId(selected)}{selected.version!=null?' · Revisão '+selected.version:''}</p></div><div className="detail-actions">{actions.filter(a=>!(a==='create')&&!(a==='save'&&screen==='fleet')).map(a=><button key={a} type="button" className={isDestructive(screen,a)?'danger-action':'secondary'} onClick={()=>openAction(a)}>{ACTION_LABELS[a]??a}</button>)}{screen==='fleet'&&<button className="secondary" onClick={()=>openAction('save')}>Editar veículo</button>}</div></div>}
-       {screen==='work-orders'&&selected&&<p className="help-banner">As ações disponíveis seguem a etapa atual da OS. Para avançar, autorize, inicie e conclua a ordem conforme seu estado.</p>}
+       <div className="table-scroll"><table><caption className="sr-only">{title} — {filtered.length} registros</caption><thead><tr>{(columns[screen]??[]).map(([key,label])=><th key={key}>{label}</th>)}<th>Detalhes</th></tr></thead><tbody>{filtered.map(row=><tr key={recordId(row)} className={chosen===recordId(row)?'selected-row':''}><React.Fragment>{(columns[screen]??[]).map(([key])=><td key={key}><span className={key==='status'||key==='due.due'?'status-pill '+((key==='due.due'&&columnValue(row,key))||(['cancelled','attention','inactive'].includes(columnValue(row,key)))?'status-danger':(['authorized','in-progress','pending','in-transit','planned'].includes(columnValue(row,key)))?'status-progress':(['completed','ok','active'].includes(columnValue(row,key)))?'status-good':''):''}>{formatValue(columnValue(row,key),key)}</span></td>)}</React.Fragment><td><button className="row-action" onClick={()=>{setChosen(chosen===recordId(row)?null:recordId(row));setPanel(null);setMessage(null)}} aria-label={'Ver detalhes de '+recordId(row)} type="button">{chosen===recordId(row)?'Ocultar':'Ver detalhes'} <Icon name="chevron" size={15}/></button></td></tr>)}</tbody></table></div>}
+       {selected&&<div className="record-detail"><div><p className="eyebrow">REGISTRO SELECIONADO</p><h3>{unwrap(selected)?.title??unwrap(selected)?.name??unwrap(selected)?.plate??recordId(selected)}</h3><p>Identificador: {recordId(selected)}{selected.version!=null?' · Revisão '+selected.version:''}</p></div><div className="detail-actions">{actions.filter(a=>!(a==='create')&&!(a==='save'&&screen==='fleet')).map(a=><button key={a} type="button" className={isDestructive(screen,a)?'danger-action':'secondary'} onClick={()=>openAction(a)}>{screen==='tires'&&a==='remove'?'Retirar pneu':ACTION_LABELS[a]??a}</button>)}{screen==='fleet'&&<button className="secondary" onClick={()=>openAction('save')}>Editar veículo</button>}</div></div>}
+       {screen==='freights'&&selected&&<section className="freight-detail" aria-label="Detalhamento do frete">
+         <h3>Resumo da viagem</h3>
+         <div className="freight-detail-grid">
+          <div><small>Cliente</small><strong>{unwrap(selected).customerPartyId}</strong></div>
+          <div><small>Carga</small><strong>{unwrap(selected).cargoDescription}</strong></div>
+          <div><small>Veículo</small><strong>{unwrap(selected).vehicleAssetId||'Aguardando despacho'}</strong></div>
+          <div><small>Motorista</small><strong>{unwrap(selected).driverPartyId||'Aguardando despacho'}</strong></div>
+          <div><small>Saída / chegada</small><strong>{unwrap(selected).odometerStart??'—'} / {unwrap(selected).odometerEnd??'—'} km</strong></div>
+          <div><small>Distância percorrida</small><strong>{unwrap(selected).distanceKm??'—'} km</strong></div>
+          <div><small>Receita prevista</small><strong>{brl(unwrap(selected).priceMinor)}</strong></div>
+          <div><small>Despesas</small><strong>{brl(unwrap(selected).expenseMinor)}</strong></div>
+          <div><small>Resultado estimado</small><strong>{brl(unwrap(selected).marginMinor)}</strong></div>
+         </div>
+         <div className="freight-detail-history">
+          <div><h4>Andamento</h4>{(unwrap(selected).statusEvents??[]).length?<ol>{unwrap(selected).statusEvents.map((x,i)=><li key={i}><strong>{formatValue(x.status,'status')}</strong> · {new Date(x.occurredAt).toLocaleString('pt-BR')} {x.location?' · '+x.location:''} {x.notes?' — '+x.notes:''}</li>)}</ol>:<p>Nenhum evento informado.</p>}</div>
+          <div><h4>Ocorrências</h4>{(unwrap(selected).incidents??[]).length?<ol>{unwrap(selected).incidents.map(x=><li key={x.id}><strong>{x.type}</strong> · {x.description} · Custo estimado {brl(x.costMinor)}</li>)}</ol>:<p>Nenhuma ocorrência registrada.</p>}</div>
+          <div><h4>Despesas lançadas</h4>{(unwrap(selected).expenses??[]).length?<ol>{unwrap(selected).expenses.map(x=><li key={x.id}>{x.description} — {brl(x.amountMinor)} ({x.category})</li>)}</ol>:<p>Nenhuma despesa lançada.</p>}</div>
+         </div>
+        </section>}
+        {screen==='work-orders'&&selected&&<p className="help-banner">As ações disponíveis seguem a etapa atual da OS. Para avançar, autorize, inicie e conclua a ordem conforme seu estado.</p>}
+        {screen==='freights'&&<p className="help-banner">Use veículos e motoristas cadastrados. Despesas entram no financeiro canônico. O resultado é estimado sobre o valor contratado, não o recebido.</p>}
        {screen==='inventory'&&<div className="footer-actions">{['receive','consume','reserve','release'].map(a=><button key={a} type="button" className="secondary" onClick={()=>openAction(a)}>{ACTION_LABELS[a]}</button>)}</div>}
        </section>}
        </>}
