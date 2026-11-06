@@ -23,6 +23,10 @@
     "overview",
     "fleet",
     "readings",
+    "fuelings",
+    "tires",
+    "documents",
+    "suppliers",
     "freights",
     "drivers",
     "freight-routes",
@@ -94,6 +98,20 @@
       "save"
     ],
     "freight-contracts": [
+      "save"
+    ],
+    "fuelings": [
+      "create"
+    ],
+    "tires": [
+      "save",
+      "install",
+      "remove"
+    ],
+    "documents": [
+      "save"
+    ],
+    "suppliers": [
       "save"
     ]
   }
