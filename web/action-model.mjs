@@ -96,6 +96,24 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],drivers
   choice('driverPartyId','Motorista cadastrado',drivers.filter(x=>x.status!=='inactive').map(v=>({value:v.partyId,label:v.partyId+' · CNH '+v.licenseNumber})),{required:true}),
   num('odometerStart','Quilometragem de saída',{required:true})
  ];
+ if(screen==='freights'&&action==='event')return [
+  choice('status','Etapa da viagem',[{value:'loading',label:'Carregamento'},{value:'in-transit',label:'Em trânsito'},{value:'delivered',label:'Entregue'}],{required:true}),
+  f('location','Local (opcional)','text'),f('notes','Observações','textarea')
+ ];
+ if(screen==='freights'&&action==='incident')return [
+  f('type','Tipo de ocorrência','text',{required:true}),f('description','Descrição','textarea',{required:true}),
+  money('costMinor','Custo estimado (R$)')
+ ];
+ if(screen==='freights'&&action==='tripExpense')return [
+  choice('category','Categoria',[{value:'fuel',label:'Combustível'},{value:'toll',label:'Pedágio'},{value:'food',label:'Alimentação'},{value:'maintenance',label:'Manutenção'},{value:'other',label:'Outros'}],{required:true}),
+  f('description','Descrição da despesa','text',{required:true}),
+  money('amountMinor','Valor (R$)',{required:true,min:0.01})
+ ];
+ if(screen==='freights'&&action==='complete')return [
+  num('odometerEnd','Quilometragem de chegada',{required:true}),
+  f('proofDocumentRef','Referência do comprovante de entrega','text')
+ ];
+ if(screen==='freights'&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
  if(screen==='settings'&&action==='restore')return [choice('id','Cópia que será restaurada',backups.map(b=>({value:b.id,label:b.id+' · '+new Date(b.createdAt).toLocaleString('pt-BR')})),{required:true})];
  return [];
 }
