@@ -4,7 +4,6 @@ import {createFreightContract,calculateFreightPrice,createRoutePlan,createFreigh
 
 const must=(x,label)=>{if(!x)throw new Error(label+' não encontrado.');return x};
 const identity=x=>String(x??'').trim();
-const cost=arr=>arr.reduce((sum,x)=>sum+x.payload.amountMinor,0);
 export function createTransportIntegration({persistence,fleet,finance}){
  const drivers=fleet.drivers; // ÚNICO cadastro de motoristas do produto
  const contracts=createEntityRepository(persistence,{collection:'freight.contracts'});
@@ -60,6 +59,9 @@ export function createTransportIntegration({persistence,fleet,finance}){
    dispatch:input=>mutate(input,async current=>{
     const vehicle=must(await fleet.vehicles.get(identity(input.vehicleAssetId)),'Veículo');
     const driver=must(await drivers.get(identity(input.driverPartyId)),'Motorista');
+    const active=(await orders.list()).filter(x=>x.payload.id!==current.id&&x.payload.status==='in-transit').map(x=>x.payload);
+    if(active.some(x=>x.vehicleAssetId===input.vehicleAssetId))throw new Error('Veículo ocupado em outra viagem.');
+    if(active.some(x=>x.driverPartyId===input.driverPartyId))throw new Error('Motorista ocupado em outra viagem.');
     if(driver.payload.status==='inactive')throw new Error('Motorista inativo.');
     if(Date.parse(driver.payload.licenseExpiresAt)<Date.now())throw new Error('CNH do motorista vencida.');
     if(Number(input.odometerStart)<Number(vehicle.payload.odometer??0))throw new Error('Quilometragem de saída menor que a leitura atual do veículo.');
