@@ -1,4 +1,4 @@
-// Adaptado do vertical ArtiSys Transportes (SistemasNichadosAgroFrota).
+// Adaptado do domínio aberto de ArtiSys Transportes para a distribuição standalone.
 // Todas as referências apontam para identidades canônicas do Frota.
 const required=(v,label)=>{const s=String(v??'').trim();if(!s)throw new Error(label+' obrigatório.');return s};
 const positiveMoney=(v,label)=>{if(!Number.isSafeInteger(v)||v<=0)throw new Error(label+' deve ser positivo em centavos.');return v};
