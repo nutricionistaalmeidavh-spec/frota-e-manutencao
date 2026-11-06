@@ -34,6 +34,10 @@ const screenHelp={
  overview:'Acompanhe os principais números, pendências e custos da operação.',
  fleet:'Consulte, cadastre e atualize os veículos e máquinas da frota.',
  readings:'Registre quilometragem e horímetro sem perder o histórico de versão do veículo.',
+ freights:'Planeje, despache e conclua fretes com despesas e resultado por viagem.',
+ drivers:'Cadastre motoristas vinculados à mesma base da frota.',
+ 'freight-routes':'Cadastre trechos e distâncias para precificar os fretes.',
+ 'freight-contracts':'Defina tarifas fixas, por km ou tonelada para clientes.',
  'preventive-plans':'Defina intervalos de manutenção por veículo e acompanhe os vencimentos.',
  'work-orders':'Acompanhe cada OS da abertura até a conclusão, com etapas e responsáveis.',
  schedule:'Ordens abertas organizadas para orientar o planejamento.',
@@ -46,6 +50,10 @@ const screenHelp={
 const columns={
  fleet:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas']],
  readings:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas'],['lastReadingAt','Última leitura']],
+ freights:[['id','Frete'],['origin','Origem'],['destination','Destino'],['vehicleAssetId','Veículo'],['status','Situação'],['priceMinor','Receita prevista'],['expenseMinor','Despesas'],['marginMinor','Resultado estimado']],
+ drivers:[['partyId','Motorista'],['licenseNumber','CNH'],['licenseCategory','Categoria'],['licenseExpiresAt','Validade'],['status','Situação']],
+ 'freight-routes':[['id','Rota'],['origin','Origem'],['destination','Destino'],['distanceKm','Distância (km)'],['tollEstimateMinor','Pedágio estimado']],
+ 'freight-contracts':[['id','Contrato'],['customerPartyId','Cliente'],['rateType','Tarifa'],['rateMinor','Valor']],
  'preventive-plans':[['name','Plano'],['assetId','Veículo'],['trigger.metric','Critério'],['due.due','Situação']],
  'work-orders':[['id','OS'],['title','Descrição'],['assetId','Veículo'],['status','Situação'],['totalCostMinor','Valor']],
  schedule:[['id','OS'],['title','Descrição'],['assetId','Veículo'],['status','Situação'],['openedAt','Aberta em']],
@@ -71,6 +79,7 @@ function formatValue(value,key){
 const navSections=[
  {name:'CONTROLE DA FROTA',items:['overview','fleet','readings']},
  {name:'MANUTENÇÃO',items:['preventive-plans','work-orders','schedule','inventory','checklists']},
+ {name:'TRANSPORTES E FRETES',items:['freights','drivers','freight-routes','freight-contracts']},
  {name:'GESTÃO',items:['finance','reports','settings']}
 ];
 function actionTitle(screen,action,selected){
