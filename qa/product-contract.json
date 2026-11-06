@@ -1,23 +1,100 @@
 {
   "productId": "fleet-maintenance",
   "databaseFile": "artisys-frota-manutencao.sqlite",
-  "migrationIds": ["frota/001-initial.sql","manutencao/001-initial.sql"],
-  "persistence": [
-    {"file":"persistence/frota.persistence.json","productId":"fleet-maintenance","databaseFile":"artisys-frota-manutencao.sqlite","migrationNamespace":"frota"},
-    {"file":"persistence/manutencao.persistence.json","productId":"fleet-maintenance","databaseFile":"artisys-frota-manutencao.sqlite","migrationNamespace":"manutencao"}
+  "migrationIds": [
+    "frota/001-initial.sql",
+    "manutencao/001-initial.sql"
   ],
-  "screens": ["overview","fleet","readings","preventive-plans","work-orders","schedule","inventory","checklists","finance","reports","settings"],
+  "persistence": [
+    {
+      "file": "persistence/frota.persistence.json",
+      "productId": "fleet-maintenance",
+      "databaseFile": "artisys-frota-manutencao.sqlite",
+      "migrationNamespace": "frota"
+    },
+    {
+      "file": "persistence/manutencao.persistence.json",
+      "productId": "fleet-maintenance",
+      "databaseFile": "artisys-frota-manutencao.sqlite",
+      "migrationNamespace": "manutencao"
+    }
+  ],
+  "screens": [
+    "overview",
+    "fleet",
+    "readings",
+    "freights",
+    "drivers",
+    "freight-routes",
+    "freight-contracts",
+    "preventive-plans",
+    "work-orders",
+    "schedule",
+    "inventory",
+    "checklists",
+    "finance",
+    "reports",
+    "settings"
+  ],
   "actions": {
     "overview": [],
-    "fleet": ["save","remove"],
-    "readings": ["save"],
-    "preventive-plans": ["create","save"],
-    "work-orders": ["create","addItem","authorize","start","complete","cancel"],
+    "fleet": [
+      "save",
+      "remove"
+    ],
+    "readings": [
+      "save"
+    ],
+    "preventive-plans": [
+      "create",
+      "save"
+    ],
+    "work-orders": [
+      "create",
+      "addItem",
+      "authorize",
+      "start",
+      "complete",
+      "cancel"
+    ],
     "schedule": [],
-    "inventory": ["receive","consume","reserve","release"],
-    "checklists": ["save"],
-    "finance": ["addExpense"],
-    "reports": ["csv","issue"],
-    "settings": ["backup","restore"]
+    "inventory": [
+      "receive",
+      "consume",
+      "reserve",
+      "release"
+    ],
+    "checklists": [
+      "save"
+    ],
+    "finance": [
+      "addExpense"
+    ],
+    "reports": [
+      "csv",
+      "issue"
+    ],
+    "settings": [
+      "backup",
+      "restore"
+    ],
+    "freights": [
+      "create",
+      "dispatch",
+      "event",
+      "incident",
+      "tripExpense",
+      "complete",
+      "cancel"
+    ],
+    "drivers": [
+      "save"
+    ],
+    "freight-routes": [
+      "save"
+    ],
+    "freight-contracts": [
+      "save"
+    ]
   }
 }
