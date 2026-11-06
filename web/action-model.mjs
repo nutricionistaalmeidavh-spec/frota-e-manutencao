@@ -49,7 +49,7 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],drivers
  if(screen==='work-orders'&&action==='authorize')return [f('authorizedByPartyId','Responsável pela autorização','text',{required:true})];
  if(screen==='work-orders'&&action==='start')return [f('technicianPartyId','Técnico responsável','text',{required:true})];
  if(screen==='work-orders'&&action==='complete')return [f('notes','Observações da conclusão','textarea'),num('meterReading','Leitura final (opcional)')];
- if(screen==='work-orders'&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
+ if(['work-orders','freights'].includes(screen)&&action==='cancel')return [f('reason','Motivo do cancelamento','textarea',{required:true})];
  if(screen==='inventory'&&['receive','consume','reserve','release'].includes(action))return [
   f('sku','Código da peça (SKU)','text',{required:true}),num('quantity','Quantidade',{required:true,min:0.001})
  ];
@@ -151,13 +151,16 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
   setPath(payload,field.key,value);
  }
  const existing=selected?.payload??selected??null;
- if(action==='save'&&existing&&['fleet','preventive-plans','checklists'].includes(screen)){
+ if(action==='save'&&existing&&['fleet','preventive-plans','checklists','drivers','freight-routes','freight-contracts'].includes(screen)){
   if(screen==='fleet')payload.assetId=existing.assetId;
+  else if(screen==='drivers')payload.partyId=existing.partyId;
   else if(screen==='preventive-plans')payload.id=existing.id;
   else payload.id=existing.id;
  }
- if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||
+ if((screen==='preventive-plans'&&action==='create')||(screen==='work-orders'&&action==='create')||(screen==='freights'&&action==='create')||
     (screen==='finance'&&action==='addExpense')||(screen==='checklists'&&action==='save'&&!existing))payload.id=uuid();
+ if(screen==='freights'&&action==='tripExpense')payload.expenseId=uuid();
+ if(screen==='freights'&&action==='incident')payload.incidentId=uuid();
  if(screen==='work-orders'&&action==='addItem'){
   payload.item.id=uuid();
  }
@@ -165,7 +168,8 @@ export function buildActionInput(screen,action,fields,draft,{selected=null,uuid=
     (screen==='readings'&&action==='save'))payload.id=existing?.id??existing?.assetId;
  if(screen==='readings'&&action==='save')payload.assetId=existing?.assetId;
  if(screen==='work-orders'&&action!=='create')payload.id=existing?.id;
- if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel'].includes(action))
+ if(screen==='freights'&&action!=='create')payload.id=existing?.id;
+ if(selected?.version!=null&&['save','remove','addItem','authorize','start','complete','cancel','dispatch','event','incident','tripExpense'].includes(action))
   payload.expectedVersion=selected.version;
  if(screen==='work-orders'&&action==='complete'&&!raw('meterReading'))delete payload.meterReading;
  if(screen==='fleet'&&action==='remove')return {id:existing.assetId,expectedVersion:selected.version};
@@ -183,6 +187,8 @@ export function allowedActions(screen,selected=null,{backups=[]}={}){
     ...(s==='draft'?['authorize']:[]),...(s==='authorized'?['start']:[]),
     ...(s==='in-progress'?['complete']:[]),...(!['completed','cancelled'].includes(s)?['cancel']:[])];
  }
+ if(screen==='freights')return !p?['create']:['create',...(p.status==='planned'?['dispatch','cancel']:[]),...(p.status==='in-transit'?['event','incident','tripExpense','complete','cancel']:[]),...(p.status==='completed'?['incident','tripExpense']:[])];
+ if(['drivers','freight-routes','freight-contracts'].includes(screen))return ['save'];
  if(screen==='inventory')return ['receive','consume','reserve','release'];
  if(screen==='checklists')return ['save'];
  if(screen==='finance')return ['addExpense'];
