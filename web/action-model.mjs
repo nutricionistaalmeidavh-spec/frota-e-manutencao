@@ -196,4 +196,4 @@ export function allowedActions(screen,selected=null,{backups=[]}={}){
  if(screen==='settings')return backups.length?['backup','restore']:['backup'];
  return [];
 }
-export const isDestructive=(screen,action)=>action==='remove'||action==='restore'||(screen==='work-orders'&&action==='cancel');
+export const isDestructive=(screen,action)=>action==='remove'||action==='restore'||(['work-orders','freights'].includes(screen)&&action==='cancel');
