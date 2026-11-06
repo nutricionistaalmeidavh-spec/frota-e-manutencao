@@ -34,6 +34,10 @@ const screenHelp={
  overview:'Acompanhe os principais números, pendências e custos da operação.',
  fleet:'Consulte, cadastre e atualize os veículos e máquinas da frota.',
  readings:'Registre quilometragem e horímetro sem perder o histórico de versão do veículo.',
+ fuelings:'Registre cada abastecimento, custo e quilometragem da frota.',
+ tires:'Acompanhe a instalação, retirada e vida útil dos pneus.',
+ documents:'Controle documentos dos veículos e suas datas de validade.',
+ suppliers:'Cadastre fornecedores da operação, oficinas e postos.',
  freights:'Planeje, despache e conclua fretes com despesas e resultado por viagem.',
  drivers:'Cadastre motoristas vinculados à mesma base da frota.',
  'freight-routes':'Cadastre trechos e distâncias para precificar os fretes.',
@@ -50,6 +54,10 @@ const screenHelp={
 const columns={
  fleet:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas']],
  readings:[['assetId','Código'],['plate','Placa'],['odometer','KM'],['hourmeter','Horas'],['lastReadingAt','Última leitura']],
+ fuelings:[['id','Abastecimento'],['assetId','Veículo'],['liters','Litros'],['unitPriceMinor','R$/L'],['totalMinor','Total'],['odometer','KM'],['occurredAt','Data']],
+ tires:[['id','Pneu'],['serialNumber','Série'],['assetId','Veículo'],['position','Posição'],['status','Situação']],
+ documents:[['id','Documento'],['assetId','Veículo'],['type','Tipo'],['number','Número'],['expiresAt','Validade']],
+ suppliers:[['partyId','Fornecedor'],['name','Nome'],['categories','Categorias']],
  freights:[['id','Frete'],['origin','Origem'],['destination','Destino'],['vehicleAssetId','Veículo'],['status','Situação'],['priceMinor','Receita prevista'],['expenseMinor','Despesas'],['marginMinor','Resultado estimado']],
  drivers:[['partyId','Motorista'],['licenseNumber','CNH'],['licenseCategory','Categoria'],['licenseExpiresAt','Validade'],['status','Situação']],
  'freight-routes':[['id','Rota'],['origin','Origem'],['destination','Destino'],['distanceKm','Distância (km)'],['tollEstimateMinor','Pedágio estimado']],
@@ -67,19 +75,20 @@ const columnValue=(row,key)=>key.split('.').reduce((o,k)=>o?.[k],key.startsWith(
 function formatValue(value,key){
  if(key==='due.due')return value?'Vencida':'Em dia';
  if(key.includes('Minor'))return brl(value);
- if(['createdAt','issuedAt','dueDate','openedAt','lastReadingAt','licenseExpiresAt','departedAt','completedAt'].includes(key))return shortDate(value);
+ if(['createdAt','issuedAt','dueDate','openedAt','lastReadingAt','licenseExpiresAt','departedAt','completedAt','occurredAt','expiresAt'].includes(key))return shortDate(value);
  if(key==='trigger.metric')return({odometer:'Quilometragem',hourmeter:'Horímetro','calendar-days':'Dias corridos'})[value]??value;
  if(key==='allocation.kind')return({freight:'Frete',vehicle:'Veículo'})[value]??value;
  if(key==='rateType')return({'fixed':'Fixo','per-km':'Por km','per-ton':'Por tonelada'})[value]??value;
- if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção',planned:'Planejado','in-transit':'Em viagem',inactive:'Inativo',active:'Ativo'})[value]??value;
+ if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção',planned:'Planejado','in-transit':'Em viagem',inactive:'Inativo',active:'Ativo',installed:'Instalado',stock:'No estoque',removed:'Retirado'})[value]??value;
  if(typeof value==='boolean')return value?'Sim':'Não';
  if(typeof value==='number')return numeric(value);
  if(value==null||value==='')return '—';
+ if(Array.isArray(value))return value.join(', ');
  if(typeof value==='object')return 'Ver detalhes';
  return String(value);
 }
 const navSections=[
- {name:'CONTROLE DA FROTA',items:['overview','fleet','readings']},
+ {name:'CONTROLE DA FROTA',items:['overview','fleet','readings','fuelings','tires','documents','suppliers']},
  {name:'MANUTENÇÃO',items:['preventive-plans','work-orders','schedule','inventory','checklists']},
  {name:'TRANSPORTES E FRETES',items:['freights','drivers','freight-routes','freight-contracts']},
  {name:'GESTÃO',items:['finance','reports','settings']}
@@ -91,6 +100,11 @@ function actionTitle(screen,action,selected){
  if(screen==='preventive-plans'&&action==='save')return 'Editar plano preventivo';
  if(screen==='work-orders'&&action==='create')return 'Nova ordem de serviço';
  if(screen==='freights'&&action==='create')return 'Novo frete';
+ if(screen==='fuelings'&&action==='create')return 'Novo abastecimento';
+ if(screen==='suppliers'&&action==='save')return selected?'Editar fornecedor':'Novo fornecedor';
+ if(screen==='documents'&&action==='save')return selected?'Editar documento':'Novo documento';
+ if(screen==='tires'&&action==='save')return selected?'Editar pneu':'Novo pneu';
+ if(screen==='tires'&&action==='remove')return 'Retirar pneu';
  if(screen==='drivers'&&action==='save')return selected?'Editar motorista':'Novo motorista';
  if(screen==='freight-routes'&&action==='save')return selected?'Editar rota':'Nova rota';
  if(screen==='freight-contracts'&&action==='save')return selected?'Editar contrato':'Novo contrato';
@@ -103,6 +117,8 @@ function actionSubmitLabel(screen,action,selected){
  if(screen==='preventive-plans'&&action==='create')return 'Criar plano';
  if(screen==='work-orders'&&action==='create')return 'Criar ordem de serviço';
  if(screen==='freights'&&action==='create')return 'Criar frete';
+ if(screen==='fuelings'&&action==='create')return 'Registrar abastecimento';
+ if(screen==='tires'&&action==='remove')return 'Retirar pneu';
  return 'Confirmar '+(ACTION_LABELS[action]??action).toLocaleLowerCase('pt-BR');
 }
 const metrics=[
@@ -121,7 +137,7 @@ function App(){
  const [needsPairing,setNeedsPairing]=useState(false),[pairCode,setPairCode]=useState('');
  const [credentials,setCredentials]=useState({username:'admin',password:''});
  const [auth,setAuth]=useState(null),[meta,setMeta]=useState(null),[screen,setScreen]=useState('overview');
- const [data,setData]=useState(null),[vehicles,setVehicles]=useState([]),[drivers,setDrivers]=useState([]),[routes,setRoutes]=useState([]),[contracts,setContracts]=useState([]),[busy,setBusy]=useState(false);
+ const [data,setData]=useState(null),[vehicles,setVehicles]=useState([]),[drivers,setDrivers]=useState([]),[routes,setRoutes]=useState([]),[contracts,setContracts]=useState([]),[plans,setPlans]=useState([]),[suppliers,setSuppliers]=useState([]),[busy,setBusy]=useState(false);
  const [message,setMessage]=useState(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
  const [chosen,setChosen]=useState(null),[panel,setPanel]=useState(null),[draft,setDraft]=useState({});
  const [search,setSearch]=useState(''),[mobileNav,setMobileNav]=useState(false),[refresh,setRefresh]=useState(0);
@@ -135,7 +151,7 @@ function App(){
  },[backend,auth,meta,screen,refresh]);
  useEffect(()=>{let active=true;if(!backend||!auth)return;backend.load({screenId:'fleet',auth}).then(d=>{if(active)setVehicles((d.rows??[]).map(unwrap))}).catch(()=>{});return()=>{active=false}},[backend,auth,refresh]);
  useEffect(()=>{let active=true;if(!backend||!auth)return;
-  for(const [id,setter] of [['drivers',setDrivers],['freight-routes',setRoutes],['freight-contracts',setContracts]]){
+  for(const [id,setter] of [['drivers',setDrivers],['freight-routes',setRoutes],['freight-contracts',setContracts],['preventive-plans',setPlans],['suppliers',setSuppliers]]){
    backend.load({screenId:id,auth}).then(d=>{if(active)setter((d.rows??[]).map(unwrap))}).catch(()=>{});
   }
   return()=>{active=false};
@@ -145,7 +161,7 @@ function App(){
  const selected=allRows.find(r=>recordId(r)===chosen)??null;
  const title=meta?.screens?.find(s=>s.id===screen)?.title??meta?.navigation?.find(n=>n.id===screen)?.label??'Visão Geral';
  const actions=allowedActions(screen,selected,{backups:data?.backups??[]});
- const actionFields=panel?getActionFields(screen,panel,{selected,vehicles,drivers,routes,contracts,backups:data?.backups??[]}):[];
+ const actionFields=panel?getActionFields(screen,panel,{selected,vehicles,drivers,routes,contracts,plans,suppliers,backups:data?.backups??[]}):[];
  const sections=navSections.map(section=>({...section,items:section.items.filter(id=>meta?.navigation?.some(n=>n.id===id))}));
  const navigate=id=>{setScreen(id);setChosen(null);setPanel(null);setMessage(null);setError('');setSearch('');setMobileNav(false);requestAnimationFrame(()=>mainHeading.current?.focus())};
  async function submitPair(e){e.preventDefault();if(!backend||busy)return;setBusy(true);setError('');try{await backend.pair(pairCode);const s=await backend.authState();setHasUsers(s.hasUsers);setNeedsPairing(false);setPairCode('')}catch(e){setError(e.message)}finally{setBusy(false)}}
@@ -155,7 +171,7 @@ function App(){
   }catch(e){if(backend.paired&&!backend.paired())setNeedsPairing(true);setError(e.message)}finally{setBusy(false)}
  }
  async function logout(){if(!backend||!auth)return;try{await backend.logout(auth)}catch{}setAuth(null);setMeta(null);setData(null);setChosen(null);setPanel(null);setError('');setCredentials(c=>({...c,password:''}))}
- const openAction=action=>{const prepared=defaultDraft(getActionFields(screen,action,{selected,vehicles,drivers,routes,contracts,backups:data?.backups??[]}),selected);initialDraft.current={...prepared};setPanel(action);setMessage(null);setError('');setDraft(prepared)};
+ const openAction=action=>{const prepared=defaultDraft(getActionFields(screen,action,{selected,vehicles,drivers,routes,contracts,plans,suppliers,backups:data?.backups??[]}),selected);initialDraft.current={...prepared};setPanel(action);setMessage(null);setError('');setDraft(prepared)};
  const closePanel=()=>{if(busy)return;const changed=Object.keys(draft).some(key=>draft[key]!==initialDraft.current[key]);if(changed&&!window.confirm('Descartar as alterações ainda não salvas?'))return;setPanel(null);setError('')};
  useEffect(()=>{if(!panel)return;const onKey=e=>{if(e.key==='Escape'&&!busy){e.preventDefault();closePanel()}};document.addEventListener('keydown',onKey);return()=>document.removeEventListener('keydown',onKey)},[panel,busy,draft]);
  async function submitAction(event){event.preventDefault();if(busy||!panel)return;
