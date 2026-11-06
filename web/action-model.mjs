@@ -64,6 +64,38 @@ export function getActionFields(screen,action,{selected=null,vehicles=[],drivers
   f('description','Descrição','text',{required:true}),f('dueDate','Vencimento (opcional)','date')
  ];
  if(screen==='reports'&&['csv','issue'].includes(action))return [choice('type','Relatório',REPORT_TYPES)];
+ if(screen==='drivers'&&action==='save')return [
+  f('partyId','Código do motorista','text',{required:true,readOnly:!!selected}),
+  f('licenseNumber','Número da CNH','text',{required:true}),
+  choice('licenseCategory','Categoria',[{value:'A',label:'A'},{value:'B',label:'B'},{value:'C',label:'C'},{value:'D',label:'D'},{value:'E',label:'E'}],{required:true}),
+  f('licenseExpiresAt','Validade da CNH','date',{required:true}),
+  choice('status','Situação',[{value:'active',label:'Ativo'},{value:'inactive',label:'Inativo'}])
+ ];
+ if(screen==='freight-routes'&&action==='save')return [
+  f('id','Código da rota','text',{required:true,readOnly:!!selected}),
+  f('origin','Origem','text',{required:true}),f('destination','Destino','text',{required:true}),
+  num('distanceKm','Distância (km)',{required:true}),money('tollEstimateMinor','Pedágio estimado (R$)')
+ ];
+ if(screen==='freight-contracts'&&action==='save')return [
+  f('id','Código do contrato','text',{required:true,readOnly:!!selected}),
+  f('customerPartyId','Código do cliente','text',{required:true}),
+  choice('rateType','Tipo de tarifa',[{value:'fixed',label:'Valor fixo'},{value:'per-km',label:'Por km'},{value:'per-ton',label:'Por tonelada'}],{required:true}),
+  money('rateMinor','Valor da tarifa (R$)',{required:true,min:0.01})
+ ];
+ if(screen==='freights'&&action==='create')return [
+  f('customerPartyId','Código do cliente','text',{required:true}),
+  f('origin','Origem','text',{required:true}),f('destination','Destino','text',{required:true}),
+  f('cargoDescription','Descrição da carga','textarea',{required:true}),
+  choice('routeId','Rota cadastrada (opcional)',[{value:'',label:'Sem rota'},...routes.map(x=>({value:x.id,label:x.origin+' → '+x.destination}))]),
+  choice('contractId','Contrato (opcional)',[{value:'',label:'Sem contrato'},...contracts.map(x=>({value:x.id,label:x.id+' · '+x.customerPartyId}))]),
+  num('weightKg','Peso (kg) para tarifa por tonelada'),
+  money('priceMinor','Valor do frete (R$) — opcional se houver contrato')
+ ];
+ if(screen==='freights'&&action==='dispatch')return [
+  choice('vehicleAssetId','Veículo da frota',vehicles.map(v=>({value:v.assetId,label:(v.plate||v.assetId)+' · '+v.assetId})),{required:true}),
+  choice('driverPartyId','Motorista cadastrado',drivers.filter(x=>x.status!=='inactive').map(v=>({value:v.partyId,label:v.partyId+' · CNH '+v.licenseNumber})),{required:true}),
+  num('odometerStart','Quilometragem de saída',{required:true})
+ ];
  if(screen==='settings'&&action==='restore')return [choice('id','Cópia que será restaurada',backups.map(b=>({value:b.id,label:b.id+' · '+new Date(b.createdAt).toLocaleString('pt-BR')})),{required:true})];
  return [];
 }
