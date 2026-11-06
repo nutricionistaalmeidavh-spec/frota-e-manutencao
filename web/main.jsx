@@ -59,9 +59,9 @@ const columnValue=(row,key)=>key.split('.').reduce((o,k)=>o?.[k],key.startsWith(
 function formatValue(value,key){
  if(key==='due.due')return value?'Vencida':'Em dia';
  if(key.includes('Minor'))return brl(value);
- if(key==='createdAt'||key==='issuedAt'||key==='dueDate'||key==='openedAt'||key==='lastReadingAt')return shortDate(value);
+ if(['createdAt','issuedAt','dueDate','openedAt','lastReadingAt','licenseExpiresAt','departedAt','completedAt'].includes(key))return shortDate(value);
  if(key==='trigger.metric')return({odometer:'Quilometragem',hourmeter:'Horímetro','calendar-days':'Dias corridos'})[value]??value;
- if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção'})[value]??value;
+ if(key==='status')return({draft:'Rascunho',authorized:'Autorizada','in-progress':'Em execução',completed:'Concluída',cancelled:'Cancelada',pending:'Pendente',ok:'Concluída',attention:'Atenção',planned:'Planejado','in-transit':'Em viagem',inactive:'Inativo',active:'Ativo'})[value]??value;
  if(typeof value==='boolean')return value?'Sim':'Não';
  if(typeof value==='number')return numeric(value);
  if(value==null||value==='')return '—';
